@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["WhisperModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.whisper.WhisperModule"]
+  }
+}

@@ -32,6 +32,27 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "The microphone is required to record your voice commands locally.",
+          "enableBackgroundRecording": false
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24,
+            "packagingOptions": {
+              "pickFirst": ["**/libc++_shared.so", "**/libjsc.so"]
+            }
+          },
+          "ios": {
+            "deploymentTarget": "16.4"
+          }
+        }
       ]
     ],
     "experiments": {
