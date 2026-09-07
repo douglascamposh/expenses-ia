@@ -1,0 +1,164 @@
+import * as FileSystem from 'expo-file-system/legacy';
+
+/**
+ * Expense API — envía audio a endpoint cloud y recibe gastos estructurados.
+ * Basado en ejemplo del usuario: FormData { audio: {uri,name,type}, model: 'gemini', currentDate }
+ * Base URL: https://expense-audio-analyzer-571414320359.us-east1.run.app
+ */
+
+export const ANALYZE_ENDPOINT =
+  'https://expense-audio-analyzer-571414320359.us-east1.run.app/api/analyze';
+
+export type Expense = {
+  amount?: number;
+  currency?: string;
+  category?: string;
+  description?: string;
+  date?: string;
+  // La API puede devolver más campos; mantenemos índice abierto
+  [key: string]: unknown;
+};
+
+export type AnalyzeResponse = {
+  expenses?: Expense[];
+  actions?: { action: string; expense?: Expense; [key: string]: unknown }[];
+  latency?: number;
+  error?: string;
+  data?: Expense[];
+  result?: Expense[];
+  [key: string]: unknown;
+};
+
+export type AnalyzeResult = {
+  expenses: Expense[];
+  raw: AnalyzeResponse | Expense[];
+  latency?: number;
+};
+
+export class AnalyzeError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = 'AnalyzeError';
+    this.status = status;
+  }
+}
+
+/**
+ * Envía audio local a la API y retorna gastos estructurados.
+ * @param localAudioUri - filePath/uri del AudioRecordingResult (file://...)
+ * @param model - modelo a usar, por defecto 'gemini'
+ */
+export async function analyzeAudio(
+  localAudioUri: string,
+  model: string = 'gemini',
+): Promise<AnalyzeResult> {
+  if (!localAudioUri || typeof localAudioUri !== 'string') {
+    throw new AnalyzeError('Audio no válido');
+  }
+
+  const formData = new FormData();
+  // Fix "Unsupported formDataPart implementation": Hono/Cloud Run espera Blob+filename, no objeto {uri}
+  // 1) Intentar Blob vía fetch(file://)  2) Fallback via expo-file-system Base64  3) Último fallback objeto uri
+  let audioAppended = false;
+  try {
+    const fileRes = await fetch(localAudioUri);
+    if (fileRes.ok) {
+      const blob = await fileRes.blob();
+      const typedBlob = blob.type ? blob : new Blob([blob], { type: 'audio/m4a' });
+      formData.append('audio', typedBlob, 'recording.m4a');
+      audioAppended = true;
+    }
+  } catch {
+    // ignore, try next method
+  }
+
+  if (!audioAppended) {
+    try {
+      const base64 = await FileSystem.readAsStringAsync(localAudioUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'audio/m4a' });
+      formData.append('audio', blob, 'recording.m4a');
+      audioAppended = true;
+    } catch {
+      // último fallback: objeto uri (React Native extension)
+    }
+  }
+
+  if (!audioAppended) {
+    formData.append('audio', {
+      uri: localAudioUri,
+      type: 'audio/m4a',
+      name: 'recording.m4a',
+    } as unknown as Blob);
+  }
+  formData.append('model', model);
+  const localDate = new Date().toISOString().split('T')[0];
+  formData.append('currentDate', localDate);
+
+  let response: Response;
+  try {
+    console.log('Enviando audio al servidor...');
+    response = await fetch(ANALYZE_ENDPOINT, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        Accept: 'application/json',
+        // Content-Type lo asigna fetch automáticamente con boundary para multipart
+      },
+    });
+  } catch (e) {
+    throw new AnalyzeError((e as Error).message ?? 'Error de red al analizar audio');
+  }
+
+  let json: AnalyzeResponse | Expense[] = {} as AnalyzeResponse;
+  try {
+    json = (await response.json()) as AnalyzeResponse | Expense[];
+  } catch {
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new AnalyzeError(`Error ${response.status}: ${text || response.statusText}`.trim(), response.status);
+    }
+    throw new AnalyzeError('Respuesta inválida del servidor');
+  }
+
+  if (!response.ok) {
+    const errMsg = (json as AnalyzeResponse)?.error as string | undefined;
+    throw new AnalyzeError((errMsg as string) || `Error ${response.status} procesando el audio`, response.status);
+  }
+
+  // Log latencia si viene
+  if (!Array.isArray(json) && typeof (json as AnalyzeResponse).latency === 'number') {
+    console.log('✅ Análisis exitoso. Latencia:', (json as AnalyzeResponse).latency, 'ms');
+  }
+
+  // Normalizar: priorizar data.actions → CREATE_EXPENSE (formato correcto del ejemplo)
+  let expenses: Expense[] = [];
+  if (!Array.isArray(json) && Array.isArray((json as AnalyzeResponse).actions)) {
+    const actions = (json as AnalyzeResponse).actions as { action: string; expense?: Expense }[];
+    expenses = actions.filter((a) => a.action === 'CREATE_EXPENSE').map((a) => a.expense as Expense).filter(Boolean);
+    // si no hay CREATE_EXPENSE pero hay actions, devolverlas tal cual
+    if (expenses.length === 0 && actions.length > 0) {
+      expenses = actions as unknown as Expense[];
+    }
+  } else if (Array.isArray(json)) {
+    expenses = json;
+  } else if (Array.isArray((json as AnalyzeResponse).expenses)) {
+    expenses = (json as AnalyzeResponse).expenses as Expense[];
+  } else if (Array.isArray((json as AnalyzeResponse).data)) {
+    expenses = (json as AnalyzeResponse).data as Expense[];
+  } else if (Array.isArray((json as AnalyzeResponse).result)) {
+    expenses = (json as AnalyzeResponse).result as Expense[];
+  } else if (json && typeof json === 'object') {
+    const maybeExpenses = (json as Record<string, unknown>).expenses;
+    if (Array.isArray(maybeExpenses)) expenses = maybeExpenses as Expense[];
+  }
+
+  console.log('Gastos detectados:', expenses);
+  const latency = !Array.isArray(json) ? (json as AnalyzeResponse).latency : undefined;
+  return { expenses, raw: json, latency };
+}

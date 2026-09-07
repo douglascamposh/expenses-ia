@@ -1,8 +1,0 @@
-{
-  "name": "whisper-expo-module",
-  "version": "1.0.0",
-  "description": "Expo native module wrapping whisper.cpp for offline speech-to-text",
-  "main": "index.ts",
-  "author": "expenses-ia",
-  "license": "MIT"
-}

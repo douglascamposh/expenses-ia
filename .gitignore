@@ -38,12 +38,6 @@ yarn-error.*
 
 example
 
-# whisper models (large binaries, bundled via asset but not committed)
-*.bin
-*.mlmodelc
-assets/models/*.bin
-vendor/whisper.cpp/
-
 # generated native folders
 /ios
 /android

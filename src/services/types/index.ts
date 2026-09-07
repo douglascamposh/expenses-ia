@@ -4,14 +4,12 @@ import type { ExpenseCommand, ValidationResult } from '@/types';
 
 /**
  * Services — application logic that does not belong in React components.
- * All services must remain offline; no fetch / Supabase / Firebase.
+ * Por ahora solo grabación de audio; STT será vía API cloud (no local).
  */
 
 export interface SpeechToTextService {
-  transcribe(audio: AudioInput | string | import('@/audio/types').AudioRecordingResult): Promise<TranscriptionResult>;
+  transcribe(audio: AudioInput): Promise<TranscriptionResult>;
   isReady(): Promise<boolean>;
-  initialize?(model?: import('@/ai/types').WhisperModel, modelPath?: string): Promise<void>;
-  dispose?(): Promise<void>;
 }
 
 export interface LocalLLMService {

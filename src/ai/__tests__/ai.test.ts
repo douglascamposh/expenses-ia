@@ -27,7 +27,7 @@ describe('AI mock engines', () => {
   });
 
   it('AI_PIPELINE_STATUS contains expected stages', () => {
-    expect(AI_PIPELINE_STATUS.audio).toBe('not_implemented');
+    expect(AI_PIPELINE_STATUS.audio).toBe('ready');
     expect(AI_PIPELINE_STATUS.whisper).toBe('not_implemented');
     expect(AI_PIPELINE_STATUS.llm).toBe('not_implemented');
     expect(AI_PIPELINE_STATUS.json).toBe('not_implemented');

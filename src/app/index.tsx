@@ -1,5 +1,5 @@
-import { LocalAITestScreen } from '@/screens/LocalAITestScreen';
+import { DashboardScreen } from '@/screens/Dashboard';
 
 export default function HomeScreen() {
-  return <LocalAITestScreen />;
+  return <DashboardScreen />;
 }

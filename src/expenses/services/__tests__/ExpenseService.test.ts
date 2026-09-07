@@ -1,0 +1,57 @@
+import { validateExpenseCommand } from '../ExpenseService';
+import { ExpenseCategory } from '../../categories/expenseCategories';
+
+describe('validateExpenseCommand', () => {
+  const base = {
+    action: 'CREATE_EXPENSE',
+    expense: {
+      amount: 35,
+      currency: 'BOB',
+      category: 'FOOD',
+      description: 'Lunch',
+      date: '2026-09-04',
+    },
+  };
+
+  it('valid command → accepted', () => {
+    const res = validateExpenseCommand(base);
+    expect(res.valid).toBe(true);
+    expect(res.normalized?.amount).toBe(35);
+  });
+
+  it('negative amount → rejected', () => {
+    const res = validateExpenseCommand({ ...base, expense: { ...base.expense, amount: -5 } });
+    expect(res.valid).toBe(false);
+    expect(res.errors.join(' ')).toMatch(/amount/);
+  });
+
+  it('zero amount → rejected', () => {
+    const res = validateExpenseCommand({ ...base, expense: { ...base.expense, amount: 0 } });
+    expect(res.valid).toBe(false);
+  });
+
+  it('invalid currency → rejected', () => {
+    const res = validateExpenseCommand({ ...base, expense: { ...base.expense, currency: 'XYZ' } });
+    expect(res.valid).toBe(false);
+  });
+
+  it('invalid category → rejected', () => {
+    const res = validateExpenseCommand({ ...base, expense: { ...base.expense, category: 'INVALID' } });
+    expect(res.valid).toBe(false);
+  });
+
+  it('missing description → rejected', () => {
+    const res = validateExpenseCommand({ ...base, expense: { ...base.expense, description: '' } });
+    expect(res.valid).toBe(false);
+  });
+
+  it('invalid date → rejected', () => {
+    const res = validateExpenseCommand({ ...base, expense: { ...base.expense, date: 'not-a-date' } });
+    expect(res.valid).toBe(false);
+  });
+
+  it('acepta formato directo sin action (para NewExpense)', () => {
+    const res = validateExpenseCommand({ amount: 20, currency: 'BOB', category: ExpenseCategory.TRANSPORT, description: 'Taxi', date: '2026-09-04' });
+    expect(res.valid).toBe(true);
+  });
+});

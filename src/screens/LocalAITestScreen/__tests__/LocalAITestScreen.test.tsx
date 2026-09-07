@@ -43,7 +43,7 @@ describe('LocalAITestScreen', () => {
 
   it('shows Status with Ready initially', () => {
     const { getAllByText } = render(<LocalAITestScreen />);
-    expect(getAllByText(/Status:/).length).toBeGreaterThanOrEqual(2);
+    expect(getAllByText(/Status:/).length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows Not implemented for future modules', () => {

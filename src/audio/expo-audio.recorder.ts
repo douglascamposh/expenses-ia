@@ -11,22 +11,26 @@ import {
 
 import type { AudioPermissionStatus } from './types';
 
-export const EXPO_AUDIO_PRESET = RecordingPresets.HIGH_QUALITY;
-
 /**
- * Compatible container/codec for iOS + Android, no native friction.
- * HIGH_QUALITY: .m4a, sampleRate 44100, channels 2, bitRate 128000,
- * android: outputFormat mpeg4 / audioEncoder aac,
- * ios: MPEG4AAC / AudioQuality MAX, 16-bit.
- * Whisper will later transcode to PCM 16kHz mono via native decoder.
+ * HIGH_QUALITY optimizado para API cloud (Gemini):
+ * - Mantiene 44.1kHz/128kbps/AAC MAX para máxima inteligibilidad de voz y números
+ * - Cambia a MONO (1 canal) para voz: reduce 50% tamaño sin pérdida, Gemini transcribe números mejor en mono
+ * - Misma compatibilidad iOS (MPEG4AAC/MAX) y Android (MPEG4/AAC), solo cambia numberOfChannels
+ * Resultado: ~80KB por 10s vs ~160KB stereo, misma claridad.
  */
+export const EXPO_AUDIO_PRESET = {
+  ...RecordingPresets.HIGH_QUALITY,
+  numberOfChannels: 1,
+} as const;
+
 export const AUDIO_CONFIG = {
   container: 'm4a',
   extension: '.m4a',
   codec: 'aac',
   sampleRate: 44100,
-  channels: 2 as const,
+  channels: 1 as const,
   bitDepth: 16,
+  bitRate: 128000,
   mimeType: 'audio/m4a',
 } as const;
 

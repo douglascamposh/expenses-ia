@@ -8,6 +8,7 @@ import {
 } from 'expo-router/ui';
 import { SymbolView } from 'expo-symbols';
 import { Pressable, useColorScheme, View, StyleSheet } from 'react-native';
+import { FileText, House, Settings } from 'lucide-react-native';
 
 import { ExternalLink } from './external-link';
 import { ThemedText } from './themed-text';
@@ -22,10 +23,13 @@ export default function AppTabs() {
       <TabList asChild>
         <CustomTabList>
           <TabTrigger name="home" href="/" asChild>
-            <TabButton>Local AI Test</TabButton>
+            <TabButton icon={House}>Home</TabButton>
           </TabTrigger>
           <TabTrigger name="explore" href="/explore" asChild>
-            <TabButton>Explore</TabButton>
+            <TabButton icon={FileText}>Expenses</TabButton>
+          </TabTrigger>
+          <TabTrigger name="settings" href={"/settings" as never} asChild>
+            <TabButton icon={Settings}>Settings</TabButton>
           </TabTrigger>
         </CustomTabList>
       </TabList>
@@ -33,16 +37,26 @@ export default function AppTabs() {
   );
 }
 
-export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps) {
+export function TabButton({ children, isFocused, icon: Icon, ...props }: TabTriggerSlotProps & { icon?: React.ComponentType<{ size?: number; color?: string }> }) {
   return (
-    <Pressable {...props} style={({ pressed }) => pressed && styles.pressed}>
-      <ThemedView
-        type={isFocused ? 'backgroundSelected' : 'backgroundElement'}
-        style={styles.tabButtonView}>
-        <ThemedText type="small" themeColor={isFocused ? 'text' : 'textSecondary'}>
-          {children}
-        </ThemedText>
-      </ThemedView>
+    <Pressable {...props} style={({ pressed }: { pressed: boolean }) => pressed && styles.pressed}>
+      {({ hovered }: { hovered?: boolean }) => {
+        const active = !!isFocused || !!hovered;
+        return (
+          <ThemedView
+            type={isFocused ? 'backgroundSelected' : 'backgroundElement'}
+            style={[
+              styles.tabButtonView,
+              isFocused && styles.tabButtonFocused,
+              hovered && !isFocused && styles.tabButtonHovered,
+            ]}>
+            {Icon && <Icon size={16} color={active ? '#2F80FF' : '#64748B'} />}
+            <ThemedText type="small" style={{ color: active ? '#2F80FF' : '#64748B' }}>
+              {children}
+            </ThemedText>
+          </ThemedView>
+        );
+      }}
     </Pressable>
   );
 }
@@ -104,6 +118,19 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
     paddingHorizontal: Spacing.three,
     borderRadius: Spacing.three,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tabButtonFocused: {
+    borderWidth: 1,
+    borderColor: '#2F80FF1A',
+    backgroundColor: '#2F80FF14',
+  },
+  tabButtonHovered: {
+    backgroundColor: '#2F80FF14',
+    borderWidth: 1,
+    borderColor: '#2F80FF26',
   },
   externalPressable: {
     flexDirection: 'row',

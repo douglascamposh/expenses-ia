@@ -50,46 +50,48 @@ jest.mock('expo-font', () => ({
 }));
 
 jest.mock('expo-file-system', () => ({
-  documentDirectory: 'file:///documentDirectory/',
-  cacheDirectory: 'file:///cache/',
-  getInfoAsync: jest.fn(() => Promise.resolve({ exists: true, size: 77 * 1024 * 1024, uri: 'file:///documentDirectory/models/ggml-tiny.bin' })),
-  makeDirectoryAsync: jest.fn(() => Promise.resolve()),
-  copyAsync: jest.fn(() => Promise.resolve()),
-  deleteAsync: jest.fn(() => Promise.resolve()),
   readAsStringAsync: jest.fn(() => Promise.resolve('')),
+  getInfoAsync: jest.fn(() => Promise.resolve({ exists: true, uri: 'file:///cache/test.m4a' })),
+  EncodingType: { Base64: 'base64', UTF8: 'utf8' },
 }));
+
 jest.mock('expo-file-system/legacy', () => ({
-  documentDirectory: 'file:///documentDirectory/',
-  cacheDirectory: 'file:///cache/',
-  getInfoAsync: jest.fn(() => Promise.resolve({ exists: true, size: 77 * 1024 * 1024, uri: 'file:///documentDirectory/models/ggml-tiny.bin' })),
+  readAsStringAsync: jest.fn(() => Promise.resolve('')),
+  getInfoAsync: jest.fn(() => Promise.resolve({ exists: true, uri: 'file:///cache/test.m4a' })),
   makeDirectoryAsync: jest.fn(() => Promise.resolve()),
   copyAsync: jest.fn(() => Promise.resolve()),
   deleteAsync: jest.fn(() => Promise.resolve()),
-  readAsStringAsync: jest.fn(() => Promise.resolve('')),
+  documentDirectory: 'file:///documentDirectory/',
+  cacheDirectory: 'file:///cache/',
+  EncodingType: { Base64: 'base64', UTF8: 'utf8' },
 }));
 
-jest.mock('expo-asset', () => ({
-  Asset: {
-    fromModule: jest.fn(() => ({
-      downloadAsync: jest.fn(() => Promise.resolve()),
-      localUri: 'file:///documentDirectory/models/ggml-tiny.bin',
-      uri: 'file:///documentDirectory/models/ggml-tiny.bin',
-    })),
-  },
+jest.mock('expo-sqlite', () => ({
+  openDatabaseAsync: jest.fn(() =>
+    Promise.resolve({
+      execAsync: jest.fn(() => Promise.resolve()),
+      runAsync: jest.fn(() => Promise.resolve({ lastInsertRowId: 1, changes: 1 })),
+      getFirstAsync: jest.fn(() => Promise.resolve(null)),
+      getAllAsync: jest.fn(() => Promise.resolve([])),
+      closeAsync: jest.fn(() => Promise.resolve()),
+    }),
+  ),
+  deleteDatabaseAsync: jest.fn(() => Promise.resolve()),
+  closeDatabaseAsync: jest.fn(() => Promise.resolve()),
 }));
 
-// Inject WhisperModule mock into NativeModules without mocking entire react-native
-try {
-  const { NativeModules } = require('react-native');
-  if (NativeModules && !NativeModules.WhisperModule) {
-    NativeModules.WhisperModule = {
-      loadModel: jest.fn(() => Promise.resolve({ sizeBytes: 77 * 1024 * 1024 })),
-      transcribe: jest.fn(() => Promise.resolve({ text: 'Hoy gasté treinta y cinco bolivianos en almuerzo.', language: 'es', segments: [] })),
-      unloadModel: jest.fn(() => Promise.resolve()),
-      getMemoryUsage: jest.fn(() => Promise.resolve(120 * 1024 * 1024)),
-    };
-  }
-} catch {}
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
+  useFocusEffect: jest.fn((cb: () => void) => {
+    try {
+      const cleanup = cb();
+      return cleanup;
+    } catch {
+      return undefined;
+    }
+  }),
+  Link: ({ children }: { children: React.ReactNode }) => children,
+}));
 
 // react-native-reanimated mock — required for jest without worklets runtime
 try {

@@ -32,17 +32,9 @@ export interface NativeModuleBase {
  */
 
 export interface WhisperNativeModule extends NativeModuleBase {
-  /** New filePath-based API (preferred, avoids Base64). */
-  loadModel(modelPath: string): Promise<{ sizeBytes?: number }>;
-  transcribe(filePath: string, opts?: { language?: string; threads?: number; translate?: boolean }): Promise<{
-    text: string;
-    language?: string;
-    segments?: { text: string; startMs: number; endMs: number }[];
-  }>;
+  transcribe(audioUri: string): Promise<{ text: string; language?: string }>;
+  loadModel(modelPath: string): Promise<void>;
   unloadModel(): Promise<void>;
-  getMemoryUsage?(): Promise<number | null>;
-  /** @deprecated legacy alias */
-  transcribeAudio?(audioUri: string): Promise<{ text: string; language?: string }>;
 }
 
 export interface LlamaNativeModule extends NativeModuleBase {

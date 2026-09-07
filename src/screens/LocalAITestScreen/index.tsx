@@ -1,18 +1,24 @@
-import { useCallback, useEffect } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useAudioRecording } from '@/hooks/use-audio-recording';
-import { useSpeechToText } from '@/hooks/use-speech-to-text';
-import { formatRTF } from '@/audio/AudioConverter';
+import { useAnalyzeAudio } from '@/hooks/use-analyze-audio';
 
 type PipelineStep = {
   label: string;
   status: string;
 };
+
+const PIPELINE_STEPS: PipelineStep[] = [
+  { label: 'Audio', status: 'Ready' },
+  { label: 'Whisper', status: 'API (cloud) — pending' },
+  { label: 'Local LLM', status: 'Not implemented' },
+  { label: 'JSON Command', status: 'Not implemented' },
+  { label: 'Validation', status: 'Ready' },
+];
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -27,106 +33,48 @@ function formatDurationSeconds(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function formatBytes(bytes?: number): string {
-  if (!bytes) return '—';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 export function LocalAITestScreen() {
   const {
-    state: audioState,
-    errorMessage: audioError,
-    result: audioResult,
+    state,
+    errorMessage,
+    result,
     durationMs,
     isRecording,
     startRecording,
     stopRecording,
-    clearError: clearAudioError,
+    clearError,
   } = useAudioRecording();
+  const { status: analyzeStatus, expenses, error: analyzeError, isLoading: isAnalyzing, analyze, reset: resetAnalyze } = useAnalyzeAudio();
 
-  const {
-    status: sttStatus,
-    result: transcription,
-    errorMessage: sttError,
-    isTranscribing,
-    transcribe,
-    reset: resetSTT,
-  } = useSpeechToText();
+  const isProcessing = state === 'processing';
+  const isRequestingPermission = state === 'requesting_permission';
+  const isError = state === 'error';
 
-  const isProcessing = audioState === 'processing';
-  const isRequestingPermission = audioState === 'requesting_permission';
-  const isAudioError = audioState === 'error';
-  const isSTTError = sttStatus === 'error';
-
-  // Auto-transcribe when audioResult appears and not already transcribing
-  useEffect(() => {
-    if (audioResult && sttStatus === 'idle' && !isTranscribing && !isRecording && !isProcessing && audioState === 'idle') {
-      // Start transcription automatically (offline, no network)
-      void transcribe(audioResult);
-    }
-  }, [audioResult, sttStatus, isTranscribing, isRecording, isProcessing, audioState, transcribe]);
-
-  const audioStatusLabel = (() => {
+  const statusLabel = (() => {
     if (isRequestingPermission) return 'Requesting permission';
-    if (audioState === 'recording' || isRecording) return 'Recording';
+    if (state === 'recording' || isRecording) return 'Recording';
     if (isProcessing) return 'Processing';
-    if (isAudioError) return 'Error';
-    if (audioResult) return 'Audio ready';
+    if (isError) return 'Error';
+    if (result) return 'Audio ready';
     return 'Ready';
   })();
 
-  const sttStatusLabel = (() => {
-    if (sttStatus === 'loading_model') return 'Loading model';
-    if (sttStatus === 'transcribing') return 'Transcribing';
-    if (sttStatus === 'complete' && transcription) return 'Complete';
-    if (sttStatus === 'error') return 'Error';
-    return 'Ready';
-  })();
-
-  const sttDotColor = (() => {
-    if (isSTTError) return '#ef4444';
-    if (sttStatus === 'transcribing' || sttStatus === 'loading_model') return '#f59e0b';
-    if (sttStatus === 'complete') return '#22c55e';
-    return '#9ca3af';
-  })();
-
-  const audioDotColor = (() => {
-    if (isAudioError) return '#ef4444';
-    if (audioState === 'recording' || isRecording) return '#ef4444';
+  const statusDotColor = (() => {
+    if (isError) return '#ef4444';
+    if (state === 'recording' || isRecording) return '#ef4444';
     if (isProcessing || isRequestingPermission) return '#f59e0b';
     return '#22c55e';
   })();
 
-  const pipelineSteps: PipelineStep[] = [
-    { label: 'Audio', status: audioResult || isRecording || isProcessing ? 'Ready' : 'Ready' },
-    { label: 'Whisper', status: sttStatus === 'complete' ? 'Ready' : sttStatus === 'transcribing' ? 'Transcribing' : sttStatus === 'loading_model' ? 'Loading' : 'Ready' },
-    { label: 'Local LLM', status: 'Not implemented' },
-    { label: 'JSON Command', status: 'Not implemented' },
-    { label: 'Validation', status: 'Ready' },
-  ];
-
-  const handlePressRecord = useCallback(() => {
-    resetSTT();
-    void startRecording();
-  }, [resetSTT, startRecording]);
-
-  const handleStop = useCallback(() => {
-    void stopRecording();
-  }, [stopRecording]);
-
-  const handleRetry = useCallback(() => {
-    if (isAudioError) clearAudioError();
-    if (isSTTError) resetSTT();
-  }, [isAudioError, isSTTError, clearAudioError, resetSTT]);
-
-  const disableRecord = isTranscribing || isProcessing || isRequestingPermission || sttStatus === 'loading_model';
-
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.header}>
           <ThemedText type="title" style={styles.title}>
             Local AI Test
           </ThemedText>
@@ -138,7 +86,7 @@ export function LocalAITestScreen() {
             </ThemedText>
           </View>
           <ThemedText type="small" themeColor="textSecondary" style={styles.subtitle}>
-            Local-first / Offline-first POC — no backend, no cloud
+            Local-first / Offline-first POC — audio → API cloud
           </ThemedText>
         </View>
 
@@ -147,7 +95,7 @@ export function LocalAITestScreen() {
         </View>
 
         <ThemedView type="backgroundElement" style={styles.pipelineCard}>
-          {pipelineSteps.map((step, idx) => (
+          {PIPELINE_STEPS.map((step, idx) => (
             <View key={step.label} style={styles.stepRow}>
               <View style={styles.stepBox}>
                 <ThemedText type="smallBold" style={styles.stepLabel}>
@@ -157,7 +105,7 @@ export function LocalAITestScreen() {
                   {step.status}
                 </ThemedText>
               </View>
-              {idx < pipelineSteps.length - 1 && (
+              {idx < PIPELINE_STEPS.length - 1 && (
                 <ThemedText type="small" themeColor="textSecondary" style={styles.arrow}>
                   ↓
                 </ThemedText>
@@ -170,45 +118,108 @@ export function LocalAITestScreen() {
           <ThemedText type="smallBold">Audio</ThemedText>
 
           <View style={styles.statusBadge}>
-            <View style={[styles.statusDot, { backgroundColor: audioDotColor }]} />
-            <ThemedText type="smallBold">Status: {audioStatusLabel}</ThemedText>
+            <View style={[styles.statusDot, { backgroundColor: statusDotColor }]} />
+            <ThemedText type="smallBold">Status: {statusLabel}</ThemedText>
           </View>
 
-          {(audioState === 'recording' || isRecording) && (
+          {(state === 'recording' || isRecording) && (
             <ThemedText type="small" themeColor="textSecondary">
               Duration: {formatDuration(durationMs)}
             </ThemedText>
           )}
 
-          {audioResult && audioState === 'idle' && !isAudioError && (
+          {result && state === 'idle' && !isError && (
             <View style={styles.resultBox}>
-              <ThemedText type="smallBold">Audio ready</ThemedText>
+              <ThemedText type="smallBold">Audio ready — listo para enviar a API</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                Duration: {formatDurationSeconds(audioResult.durationMs)}
+                Duration: {formatDurationSeconds(result.durationMs)}
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                Format: {audioResult.format} • {audioResult.mimeType}
+                Format: {result.format} • {result.mimeType}
               </ThemedText>
               <ThemedText type="code" style={styles.filePath}>
-                {audioResult.filePath}
+                {result.filePath}
               </ThemedText>
+              <Pressable
+                onPress={() => void analyze(result.filePath)}
+                disabled={isAnalyzing}
+                style={({ pressed }) => [
+                  styles.analyzeButton,
+                  isAnalyzing && styles.disabledButton,
+                  pressed && !isAnalyzing && styles.pressed,
+                ]}
+              >
+                <ThemedText type="smallBold" style={styles.analyzeText}>
+                  {isAnalyzing ? 'Analizando…' : 'Analizar gasto'}
+                </ThemedText>
+              </Pressable>
             </View>
           )}
 
-          {isAudioError && audioError && (
+          {analyzeStatus !== 'idle' && (
+            <View style={styles.resultBox}>
+              <ThemedText type="smallBold">
+                {analyzeStatus === 'loading' ? 'Analizando audio…' : analyzeStatus === 'success' ? 'Gastos detectados' : 'Error'}
+              </ThemedText>
+              {analyzeStatus === 'success' && expenses && (
+                <View style={styles.expensesBox}>
+                  {expenses.length === 0 ? (
+                    <ThemedText type="small" themeColor="textSecondary">
+                      No se detectaron gastos
+                    </ThemedText>
+                  ) : (
+                    expenses.map((exp, idx) => (
+                      <View key={idx} style={styles.expenseItem}>
+                        <ThemedText type="small" style={styles.expenseText}>
+                          {JSON.stringify(exp, null, 2)}
+                        </ThemedText>
+                      </View>
+                    ))
+                  )}
+                </View>
+              )}
+              {analyzeStatus === 'error' && analyzeError && (
+                <View style={styles.errorBox}>
+                  <ThemedText type="small" style={styles.errorText}>
+                    {analyzeError}
+                  </ThemedText>
+                  <Pressable
+                    onPress={() => result && void analyze(result.filePath)}
+                    style={({ pressed }) => [styles.tryAgainButton, pressed && styles.pressed]}
+                  >
+                    <ThemedText type="smallBold" style={styles.tryAgainText}>
+                      Reintentar
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              )}
+              {analyzeStatus !== 'loading' && (
+                <Pressable
+                  onPress={resetAnalyze}
+                  style={({ pressed }) => [styles.tryAgainButton, pressed && styles.pressed]}
+                >
+                  <ThemedText type="smallBold" style={styles.tryAgainText}>
+                    Limpiar
+                  </ThemedText>
+                </Pressable>
+              )}
+            </View>
+          )}
+
+          {isError && errorMessage && (
             <View style={styles.errorBox}>
               <ThemedText type="smallBold" style={styles.errorTitle}>
-                {audioError.includes('permission') || audioError.includes('Permission')
+                {errorMessage.includes('permission') || errorMessage.includes('Permission')
                   ? 'Microphone permission required'
                   : 'Recording error'}
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary" style={styles.errorText}>
-                {audioError.includes('permission') || audioError.includes('Permission')
+                {errorMessage.includes('permission') || errorMessage.includes('Permission')
                   ? 'The microphone permission is required to record your voice commands.'
-                  : audioError}
+                  : errorMessage}
               </ThemedText>
               <Pressable
-                onPress={handleRetry}
+                onPress={clearError}
                 style={({ pressed }) => [styles.tryAgainButton, pressed && styles.pressed]}
               >
                 <ThemedText type="smallBold" style={styles.tryAgainText}>
@@ -219,9 +230,9 @@ export function LocalAITestScreen() {
           )}
 
           <View style={styles.buttonRow}>
-            {audioState === 'recording' || isRecording ? (
+            {state === 'recording' || isRecording ? (
               <Pressable
-                onPress={handleStop}
+                onPress={() => void stopRecording()}
                 style={({ pressed }) => [styles.stopButton, pressed && styles.pressed]}
               >
                 <ThemedText type="smallBold" style={styles.stopText}>
@@ -234,104 +245,28 @@ export function LocalAITestScreen() {
                   {isRequestingPermission ? 'Requesting permission…' : 'Processing…'}
                 </ThemedText>
               </View>
-            ) : isAudioError ? null : (
+            ) : isError ? null : (
               <Pressable
-                onPress={handlePressRecord}
-                disabled={disableRecord}
-                style={({ pressed }) => [
-                  styles.startButton,
-                  disableRecord && styles.disabledButton,
-                  pressed && !disableRecord && styles.pressed,
-                ]}
+                onPress={() => void startRecording()}
+                style={({ pressed }) => [styles.startButton, pressed && styles.pressed]}
               >
                 <ThemedText type="smallBold" style={styles.startText}>
-                  {disableRecord ? 'Processing…' : 'Start Recording'}
+                  Start Recording
                 </ThemedText>
               </Pressable>
             )}
           </View>
         </ThemedView>
 
-        {/* Speech-to-Text Card */}
-        <ThemedView type="backgroundElement" style={styles.audioCard}>
-          <ThemedText type="smallBold">Speech-to-Text</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            Model: Tiny • Language: Spanish • Runtime: whisper.cpp
-          </ThemedText>
-
-          <View style={styles.statusBadge}>
-            <View style={[styles.statusDot, { backgroundColor: sttDotColor }]} />
-            <ThemedText type="smallBold">Status: {sttStatusLabel}</ThemedText>
-          </View>
-
-          {(sttStatus === 'transcribing' || sttStatus === 'loading_model') && (
-            <ThemedText type="small" themeColor="textSecondary">
-              {sttStatus === 'loading_model' ? 'Loading model…' : 'Transcribing…'}
+          <View style={styles.footer}>
+            <ThemedText type="code" style={styles.footerText}>
+              Audio → API → LLM → JSON → Validation
             </ThemedText>
-          )}
-
-          {transcription && sttStatus === 'complete' && (
-            <View style={styles.resultBox}>
-              <ThemedText type="smallBold">Transcription:</ThemedText>
-              <ThemedText type="small" style={styles.transcriptionText}>
-                &quot;{transcription.text}&quot;
-              </ThemedText>
-              <View style={styles.metricsRow}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Processing time: {formatDurationSeconds(transcription.transcriptionDurationMs)}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Audio duration: {formatDurationSeconds(transcription.audioDurationMs)}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Realtime factor: {formatRTF(transcription.rtf)}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Model: {transcription.modelName ?? 'Tiny'}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Model size: {formatBytes(transcription.modelSizeBytes)}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Memory: {transcription.memoryUsageBytes ? formatBytes(transcription.memoryUsageBytes) : 'unavailable'}
-                </ThemedText>
-                {transcription.language && (
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Language: {transcription.language}
-                  </ThemedText>
-                )}
-              </View>
-            </View>
-          )}
-
-          {isSTTError && sttError && (
-            <View style={styles.errorBox}>
-              <ThemedText type="smallBold" style={styles.errorTitle}>
-                Transcription error
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.errorText}>
-                {sttError}
-              </ThemedText>
-              <Pressable
-                onPress={handleRetry}
-                style={({ pressed }) => [styles.tryAgainButton, pressed && styles.pressed]}
-              >
-                <ThemedText type="smallBold" style={styles.tryAgainText}>
-                  Try Again
-                </ThemedText>
-              </Pressable>
-            </View>
-          )}
-        </ThemedView>
-
-        <View style={styles.footer}>
-          <ThemedText type="code" style={styles.footerText}>
-            Audio → Whisper → LLM → JSON → Validation
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.footerHint}>
-            Works in airplane mode • Temporary file for transcription only
-          </ThemedText>
-        </View>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.footerHint}>
+              Grabación local • Transcripción vía API cloud (próximo paso)
+            </ThemedText>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     </ThemedView>
   );
@@ -343,12 +278,13 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: Spacing.four,
-    gap: Spacing.three,
-    alignItems: 'stretch',
-    justifyContent: 'flex-start',
     paddingTop: Spacing.six,
     paddingBottom: Spacing.four,
+    gap: Spacing.three,
+    flexGrow: 1,
   },
   header: {
     alignItems: 'center',
@@ -440,16 +376,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
   },
-  transcriptionText: {
-    textAlign: 'center',
-    fontStyle: 'italic',
-    marginVertical: 4,
-  },
-  metricsRow: {
-    alignItems: 'center',
-    gap: 2,
-    marginTop: 4,
-  },
   errorBox: {
     alignItems: 'center',
     gap: Spacing.one,
@@ -514,7 +440,34 @@ const styles = StyleSheet.create({
     borderColor: '#E0E1E6',
     minWidth: 160,
     alignItems: 'center',
-    opacity: 0.6,
+  },
+  analyzeButton: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.two,
+    borderRadius: 999,
+    minWidth: 160,
+    alignItems: 'center',
+    marginTop: Spacing.two,
+  },
+  analyzeText: {
+    color: '#ffffff',
+  },
+  expensesBox: {
+    width: '100%',
+    gap: Spacing.two,
+    marginTop: Spacing.two,
+  },
+  expenseItem: {
+    width: '100%',
+    padding: Spacing.two,
+    borderRadius: Spacing.two,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#6ee7b7',
+  },
+  expenseText: {
+    fontSize: 12,
   },
   pressed: {
     opacity: 0.7,

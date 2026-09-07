@@ -2,7 +2,7 @@ module.exports = {
   preset: 'jest-expo',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-clone-referenced-element|@react-native-community|expo-router|@unimodules/.*|unimodules|sentry-expo|native-base|react-clone-referenced-element)',
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-clone-referenced-element|@react-native-community|expo-router|@unimodules/.*|unimodules|sentry-expo|native-base|react-clone-referenced-element|react-redux|@reduxjs|redux|immer|reselect)',
   ],
   moduleNameMapper: {
     '\\.css$': '<rootDir>/__mocks__/cssMock.js',

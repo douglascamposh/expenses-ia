@@ -3,9 +3,9 @@ import { useAudioRecorder, useAudioRecorderState } from 'expo-audio';
 
 import {
   AUDIO_CONFIG,
+  EXPO_AUDIO_PRESET,
   getRecordingPermissionStatus,
   prepareAudioModeForRecording,
-  RecordingPresets,
   requestRecordingPermission,
   resetAudioModeAfterRecording,
 } from '@/audio/expo-audio.recorder';
@@ -20,14 +20,14 @@ type UseAudioRecordingReturn = {
   isRecording: boolean;
   requestPermission: () => Promise<boolean>;
   startRecording: () => Promise<void>;
-  stopRecording: () => Promise<void>;
+  stopRecording: () => Promise<AudioRecordingResult | null>;
   cancelRecording: () => Promise<void>;
   clearError: () => void;
   clearResult: () => void;
 };
 
 export function useAudioRecording(): UseAudioRecordingReturn {
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorder = useAudioRecorder(EXPO_AUDIO_PRESET);
   const recorderState = useAudioRecorderState(recorder, 200);
 
   const [state, setState] = useState<AudioRecordingState>('idle');
@@ -84,7 +84,7 @@ export function useAudioRecording(): UseAudioRecordingReturn {
       }
 
       await prepareAudioModeForRecording();
-      await recorder.prepareToRecordAsync(RecordingPresets.HIGH_QUALITY);
+      await recorder.prepareToRecordAsync(EXPO_AUDIO_PRESET);
       recorder.record();
       setState('recording');
     } catch (e) {
@@ -96,10 +96,9 @@ export function useAudioRecording(): UseAudioRecordingReturn {
     }
   }, [recorder]);
 
-  const stopRecording = useCallback(async (): Promise<void> => {
+  const stopRecording = useCallback(async (): Promise<AudioRecordingResult | null> => {
     if (state !== 'recording') {
-      // Guard invalid state transition
-      return;
+      return null;
     }
     setState('processing');
     setErrorMessage(null);
@@ -122,12 +121,14 @@ export function useAudioRecording(): UseAudioRecordingReturn {
       setResult(res);
       setState('idle');
       await resetAudioModeAfterRecording();
+      return res;
     } catch (e) {
       setState('error');
       setErrorMessage((e as Error).message ?? 'Unable to save recording');
       try {
         await resetAudioModeAfterRecording();
       } catch {}
+      return null;
     }
   }, [recorder, state, durationMs]);
 
