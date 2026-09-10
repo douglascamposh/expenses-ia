@@ -5,7 +5,7 @@ let db: SQLite.SQLiteDatabase | null = null;
 let dbInit: Promise<SQLite.SQLiteDatabase> | null = null;
 
 const DB_NAME = 'expenses.db';
-const DB_VERSION = 1;
+const DB_VERSION = 6;
 
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (db) return db;
@@ -114,8 +114,80 @@ async function migrate(database: SQLite.SQLiteDatabase) {
     await database.runAsync('INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (?, ?)', [DB_VERSION, new Date().toISOString()]);
   }
 
+  if (current < 2) {
+    await database.execAsync(`
+      CREATE TABLE IF NOT EXISTS budgets (
+        category TEXT PRIMARY KEY NOT NULL,
+        amount REAL NOT NULL,
+        currency TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+    await database.runAsync('INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (?, ?)', [2, new Date().toISOString()]);
+  }
+
+  if (current < 3) {
+    // Gastos existentes quedan en CASH por el DEFAULT.
+    // Idempotente: si un inicio previo falló entre el ALTER y el INSERT,
+    // la columna ya existe y se continúa sin error.
+    try {
+      await database.execAsync(`
+        ALTER TABLE expenses ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'CASH';
+      `);
+    } catch (e) {
+      const msg = String((e as Error)?.message ?? e ?? '').toLowerCase();
+      if (!msg.includes('duplicate column')) throw e;
+      if (__DEV__) console.warn('[sqlite] payment_method ya existe, se continúa');
+    }
+    await database.runAsync('INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (?, ?)', [3, new Date().toISOString()]);
+  }
+
+  if (current < 4) {
+    await database.execAsync(`
+      CREATE TABLE IF NOT EXISTS expense_embeddings (
+        expense_id TEXT PRIMARY KEY NOT NULL,
+        embedding BLOB NOT NULL,
+        model TEXT NOT NULL,
+        dims INTEGER NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_embeddings_model ON expense_embeddings(model);
+      CREATE TRIGGER IF NOT EXISTS trg_expenses_delete_embedding
+      AFTER DELETE ON expenses BEGIN
+        DELETE FROM expense_embeddings WHERE expense_id = OLD.id;
+      END;
+    `);
+    await database.runAsync('INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (?, ?)', [4, new Date().toISOString()]);
+  }
+
+  if (current < 5) {
+    // Ajustes clave-valor (moneda por defecto, etc.)
+    await database.execAsync(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+    await database.runAsync('INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (?, ?)', [5, new Date().toISOString()]);
+  }
+
+  if (current < 6) {
+    // Categorías personalizadas (nombre + emoji + color)
+    await database.execAsync(`
+      CREATE TABLE IF NOT EXISTS custom_categories (
+        id TEXT PRIMARY KEY NOT NULL,
+        label TEXT NOT NULL,
+        emoji TEXT NOT NULL,
+        color TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+    `);
+    await database.runAsync('INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (?, ?)', [6, new Date().toISOString()]);
+  }
+
   // Futuras migraciones:
-  // if (current < 2) { ... }
+  // if (current < 7) { ... }
 }
 
 async function getCurrentVersion(database: SQLite.SQLiteDatabase): Promise<number> {

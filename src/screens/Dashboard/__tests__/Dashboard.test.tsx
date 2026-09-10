@@ -1,8 +1,9 @@
-import { render, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { DashboardScreen } from '../index';
 import expensesReducer from '@/store/expensesSlice';
+import settingsReducer from '@/store/settingsSlice';
 
 // Mock hooks
 jest.mock('@/hooks/use-audio-recording', () => ({
@@ -42,7 +43,7 @@ jest.mock('@/expenses/repositories/ExpenseRepository', () => ({
 
 function renderWithStore() {
   const testStore = configureStore({
-    reducer: { expenses: expensesReducer },
+    reducer: { expenses: expensesReducer, settings: settingsReducer },
     middleware: (g) => g({ serializableCheck: false }),
   });
   return render(
@@ -62,5 +63,29 @@ describe('Dashboard', () => {
   it('shows CTA when empty', async () => {
     const { getByText } = renderWithStore();
     await waitFor(() => expect(getByText(/Start tracking/)).toBeTruthy());
+  });
+
+  it('muestra la lista unificada sin duplicar (solo gasto, sin barra)', async () => {
+    const { expenseRepository } = jest.requireMock('@/expenses/repositories/ExpenseRepository') as {
+      expenseRepository: { getCategorySummary: jest.Mock };
+    };
+    expenseRepository.getCategorySummary.mockResolvedValueOnce([
+      { category: 'FOOD', currency: 'BOB', total: 120 },
+    ]);
+    const { getByText, getAllByText, queryByText } = renderWithStore();
+    await waitFor(() => expect(getByText('Food')).toBeTruthy());
+    // Una sola vez y como solo-gasto (sin presupuesto no hay % ni barra)
+    expect(getAllByText('Food')).toHaveLength(1);
+    expect(getByText('Bs 120 gastados')).toBeTruthy();
+    expect(queryByText('100%')).toBeNull();
+  });
+
+  it('botón + abre el modal de alta manual', async () => {
+    const { getByLabelText, getByText, queryAllByLabelText } = renderWithStore();
+    await waitFor(() => expect(getByText(/No expenses yet/)).toBeTruthy());
+    // Una sola entrada: el + del header (el + junto al micrófono se quitó)
+    expect(queryAllByLabelText('Agregar gasto manual')).toHaveLength(1);
+    fireEvent.press(getByLabelText('Agregar gasto manual'));
+    await waitFor(() => expect(getByText('Nuevo gasto')).toBeTruthy());
   });
 });

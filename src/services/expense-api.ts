@@ -9,6 +9,24 @@ import * as FileSystem from 'expo-file-system/legacy';
 export const ANALYZE_ENDPOINT =
   'https://expense-audio-analyzer-571414320359.us-east1.run.app/api/analyze';
 
+export const EMBED_ENDPOINT =
+  'https://expense-audio-analyzer-571414320359.us-east1.run.app/api/embed';
+
+export type EmbedResult = {
+  vector: Float32Array;
+  model: string;
+  dims: number;
+};
+
+export class EmbedError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = 'EmbedError';
+    this.status = status;
+  }
+}
+
 export type Expense = {
   amount?: number;
   currency?: string;
@@ -161,4 +179,50 @@ export async function analyzeAudio(
   console.log('Gastos detectados:', expenses);
   const latency = !Array.isArray(json) ? (json as AnalyzeResponse).latency : undefined;
   return { expenses, raw: json, latency };
+}
+
+/**
+ * Genera el embedding de un texto vía backend.
+ * Contrato: POST { text } → { embedding: number[], model?: string, dims?: number }.
+ * Defensivo: acepta `embedding`/`vector`/`data` como vector y deriva dims/model si faltan.
+ */
+export async function embedText(text: string, endpoint: string = EMBED_ENDPOINT): Promise<EmbedResult> {
+  if (!text || typeof text !== 'string' || text.trim().length === 0) {
+    throw new EmbedError('Texto vacío para embedding');
+  }
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+  } catch (e) {
+    throw new EmbedError((e as Error).message ?? 'Error de red al generar embedding');
+  }
+  let json: Record<string, unknown>;
+  try {
+    json = (await response.json()) as Record<string, unknown>;
+  } catch {
+    throw new EmbedError('Respuesta inválida del endpoint de embeddings', response.status);
+  }
+  if (!response.ok) {
+    const errMsg = typeof json?.error === 'string' ? json.error : undefined;
+    throw new EmbedError(errMsg || `Error ${response.status} generando embedding`, response.status);
+  }
+  const raw = json.embedding ?? json.vector ?? json.data;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new EmbedError('El backend no devolvió embedding');
+  }
+  const vector = Float32Array.from(raw, (v) => {
+    const n = Number(v);
+    if (!isFinite(n)) throw new EmbedError('Embedding con valores no numéricos');
+    return n;
+  });
+  const dims = typeof json.dims === 'number' && json.dims > 0 ? json.dims : vector.length;
+  if (dims !== vector.length) {
+    throw new EmbedError(`Dims inconsistentes: esperado ${dims}, recibido ${vector.length}`);
+  }
+  const model = typeof json.model === 'string' && json.model.length > 0 ? json.model : 'backend-default';
+  return { vector, model, dims };
 }

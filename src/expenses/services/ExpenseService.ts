@@ -1,6 +1,6 @@
 import { ExpenseCategory, isValidCategory } from '../categories/expenseCategories';
-import type { Expense, NewExpense } from '../models/Expense';
-import { isValidCurrency } from '../models/Expense';
+import type { Expense, NewExpense, PaymentMethod } from '../models/Expense';
+import { isValidCurrency, isValidPaymentMethod } from '../models/Expense';
 import type { ExpenseRepository } from '../repositories/ExpenseRepository';
 
 export type ValidationResult = { valid: boolean; errors: string[] };
@@ -33,6 +33,7 @@ export function validateExpenseCommand(input: unknown): { valid: boolean; errors
   const category = expenseRaw.category as string | undefined;
   const description = expenseRaw.description as string | undefined;
   const date = expenseRaw.date as string | undefined;
+  const paymentMethod = expenseRaw.paymentMethod as string | undefined;
   const confidence = expenseRaw.confidence as number | undefined;
 
   if (amount === undefined || amount === null) errors.push('amount es requerido');
@@ -40,7 +41,7 @@ export function validateExpenseCommand(input: unknown): { valid: boolean; errors
   else if (amount <= 0) errors.push('amount debe ser > 0');
 
   if (!currency) errors.push('currency es requerida');
-  else if (!isValidCurrency(String(currency))) errors.push('currency debe ser BOB, USD o EUR');
+  else if (!isValidCurrency(String(currency))) errors.push(`currency inválida: ${currency}`);
 
   if (!category) errors.push('category es requerida');
   else if (!isValidCategory(String(category))) errors.push(`category inválida: ${category}`);
@@ -62,6 +63,14 @@ export function validateExpenseCommand(input: unknown): { valid: boolean; errors
     }
   }
 
+  // Método de pago: default CASH si no viene (voz/backend aún no lo envían);
+  // si viene inválido, es error.
+  let normalizedMethod: PaymentMethod = 'CASH';
+  if (paymentMethod !== undefined && paymentMethod !== null && String(paymentMethod).trim() !== '') {
+    if (!isValidPaymentMethod(String(paymentMethod))) errors.push('paymentMethod debe ser CASH o CARD');
+    else normalizedMethod = String(paymentMethod) as PaymentMethod;
+  }
+
   if (errors.length > 0) return { valid: false, errors };
 
   // Normalizar date a YYYY-MM-DD
@@ -78,6 +87,7 @@ export function validateExpenseCommand(input: unknown): { valid: boolean; errors
     category: String(category) as ExpenseCategory,
     description: String(description).trim(),
     date: normalizedDate,
+    paymentMethod: normalizedMethod,
     confidence: typeof confidence === 'number' ? confidence : undefined,
   };
 

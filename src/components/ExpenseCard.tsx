@@ -4,6 +4,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { getCategoryConfig } from '@/expenses/categories/expenseCategories';
 import type { Expense } from '@/expenses/models/Expense';
+import { getPaymentEmoji, getPaymentLabel } from '@/expenses/models/Expense';
 import { formatCurrency, formatDateLabel } from '@/expenses/utils/format';
 
 export function ExpenseCard({ expense, onPress }: { expense: Expense; onPress?: () => void }) {
@@ -16,7 +17,7 @@ export function ExpenseCard({ expense, onPress }: { expense: Expense; onPress?: 
         </View>
         <View style={styles.middle}>
           <Text variant="smallBold" numberOfLines={1}>{expense.description}</Text>
-          <Text variant="small" color="textSecondary">{cat.label} · {formatDateLabel(expense.date)}</Text>
+          <Text variant="small" color="textSecondary">{cat.label} · {formatDateLabel(expense.date)} · {getPaymentEmoji(expense.paymentMethod ?? 'CASH')} {getPaymentLabel(expense.paymentMethod ?? 'CASH')}</Text>
         </View>
         <Text variant="smallBold" style={styles.amount}>{formatCurrency(expense.amount, expense.currency)}</Text>
       </ThemedView>

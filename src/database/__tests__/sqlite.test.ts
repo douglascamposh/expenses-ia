@@ -107,6 +107,125 @@ describe('getDatabase single-flight', () => {
     expect(sqliteMock.openDatabaseAsync).toHaveBeenCalledTimes(2);
   });
 
+  it('migración v3 agrega payment_method en instalaciones v2', async () => {
+    const execCalls: string[] = [];
+    const runCalls: unknown[][] = [];
+    sqliteMock.openDatabaseAsync.mockImplementationOnce(() =>
+      Promise.resolve({
+        execAsync: jest.fn((sql: string) => {
+          execCalls.push(String(sql));
+          return Promise.resolve();
+        }),
+        runAsync: jest.fn((...args: unknown[]) => {
+          runCalls.push(args);
+          return Promise.resolve({});
+        }),
+        getFirstAsync: jest.fn(() => Promise.resolve({ version: 2 })),
+        getAllAsync: jest.fn(() => Promise.resolve([])),
+        closeAsync: jest.fn(() => Promise.resolve()),
+      }),
+    );
+    const db = await getDatabase();
+    expect(db).toBeDefined();
+    expect(execCalls.some((s) => s.includes('ADD COLUMN payment_method'))).toBe(true);
+    expect(runCalls.some((a) => String(a[0]).includes('_migrations') && (a[1] as unknown[])[0] === 3)).toBe(true);
+    expect(sqliteMock.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
+
+  it('ALTER duplicado (reintento tras crash) no rompe el inicio', async () => {
+    sqliteMock.openDatabaseAsync.mockImplementationOnce(() =>
+      Promise.resolve({
+        execAsync: jest.fn((sql: string) => {
+          if (String(sql).includes('ADD COLUMN')) return Promise.reject(new Error('duplicate column name: payment_method'));
+          return Promise.resolve();
+        }),
+        runAsync: jest.fn(() => Promise.resolve({})),
+        getFirstAsync: jest.fn(() => Promise.resolve({ version: 2 })),
+        getAllAsync: jest.fn(() => Promise.resolve([])),
+        closeAsync: jest.fn(() => Promise.resolve()),
+      }),
+    );
+    const db = await getDatabase();
+    expect(db).toBeDefined();
+    expect(sqliteMock.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
+
+  it('migración v4 crea expense_embeddings + trigger en instalaciones v3', async () => {
+    const execCalls: string[] = [];
+    const runCalls: unknown[][] = [];
+    sqliteMock.openDatabaseAsync.mockImplementationOnce(() =>
+      Promise.resolve({
+        execAsync: jest.fn((sql: string) => {
+          execCalls.push(String(sql));
+          return Promise.resolve();
+        }),
+        runAsync: jest.fn((...args: unknown[]) => {
+          runCalls.push(args);
+          return Promise.resolve({});
+        }),
+        getFirstAsync: jest.fn(() => Promise.resolve({ version: 3 })),
+        getAllAsync: jest.fn(() => Promise.resolve([])),
+        closeAsync: jest.fn(() => Promise.resolve()),
+      }),
+    );
+    const db = await getDatabase();
+    expect(db).toBeDefined();
+    expect(execCalls.some((s) => s.includes('CREATE TABLE IF NOT EXISTS expense_embeddings'))).toBe(true);
+    expect(execCalls.some((s) => s.includes('trg_expenses_delete_embedding'))).toBe(true);
+    expect(runCalls.some((a) => String(a[0]).includes('_migrations') && (a[1] as unknown[])[0] === 4)).toBe(true);
+    expect(sqliteMock.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
+
+  it('migración v5 crea tabla settings en instalaciones v4', async () => {
+    const execCalls: string[] = [];
+    const runCalls: unknown[][] = [];
+    sqliteMock.openDatabaseAsync.mockImplementationOnce(() =>
+      Promise.resolve({
+        execAsync: jest.fn((sql: string) => {
+          execCalls.push(String(sql));
+          return Promise.resolve();
+        }),
+        runAsync: jest.fn((...args: unknown[]) => {
+          runCalls.push(args);
+          return Promise.resolve({});
+        }),
+        getFirstAsync: jest.fn(() => Promise.resolve({ version: 4 })),
+        getAllAsync: jest.fn(() => Promise.resolve([])),
+        closeAsync: jest.fn(() => Promise.resolve()),
+      }),
+    );
+    const db = await getDatabase();
+    expect(db).toBeDefined();
+    expect(execCalls.some((s) => s.includes('CREATE TABLE IF NOT EXISTS settings'))).toBe(true);
+    expect(runCalls.some((a) => String(a[0]).includes('_migrations') && (a[1] as unknown[])[0] === 5)).toBe(true);
+    expect(sqliteMock.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
+
+  it('migración v6 crea custom_categories en instalaciones v5', async () => {
+    const execCalls: string[] = [];
+    const runCalls: unknown[][] = [];
+    sqliteMock.openDatabaseAsync.mockImplementationOnce(() =>
+      Promise.resolve({
+        execAsync: jest.fn((sql: string) => {
+          execCalls.push(String(sql));
+          return Promise.resolve();
+        }),
+        runAsync: jest.fn((...args: unknown[]) => {
+          runCalls.push(args);
+          return Promise.resolve({});
+        }),
+        getFirstAsync: jest.fn(() => Promise.resolve({ version: 5 })),
+        getAllAsync: jest.fn(() => Promise.resolve([])),
+        closeAsync: jest.fn(() => Promise.resolve()),
+      }),
+    );
+    const db = await getDatabase();
+    expect(db).toBeDefined();
+    expect(execCalls.some((s) => s.includes('CREATE TABLE IF NOT EXISTS custom_categories'))).toBe(true);
+    expect(runCalls.some((a) => String(a[0]).includes('_migrations') && (a[1] as unknown[])[0] === 6)).toBe(true);
+    expect(sqliteMock.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
+
   it('si hasta el rebuild falla, lanza error claro en español', async () => {
     sqliteMock.openDatabaseAsync.mockImplementation(() =>
       Promise.resolve({

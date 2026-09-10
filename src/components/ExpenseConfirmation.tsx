@@ -4,9 +4,10 @@ import { View, StyleSheet } from 'react-native';
 import { Check } from 'lucide-react-native';
 import { Text, Button, Chip, Input } from '@/components/ui';
 import { Modal } from '@/components/ui/Modal';
+import { CategoryPicker } from '@/components/CategoryPicker';
 import { Spacing } from '@/constants/theme';
-import { EXPENSE_CATEGORIES, getCategoryConfig } from '@/expenses/categories/expenseCategories';
-import type { NewExpense } from '@/expenses/models/Expense';
+import { getCategoryConfig } from '@/expenses/categories/expenseCategories';
+import { SUPPORTED_CURRENCIES, type NewExpense } from '@/expenses/models/Expense';
 import { formatCurrency } from '@/expenses/utils/format';
 
 type Props = {
@@ -61,13 +62,9 @@ export function ExpenseConfirmation({ visible, expense, onSave, onCancel, subtit
             <Text variant="smallBold">Editar</Text>
             <Input value={String(draft.amount)} onChangeText={(t) => setDraft({ ...draft, amount: parseFloat(t) || 0 })} keyboardType="numeric" placeholder="Amount" />
             <Input value={draft.description} onChangeText={(t) => setDraft({ ...draft, description: t })} placeholder="Description" />
-            <View style={styles.categoryGrid}>
-              {EXPENSE_CATEGORIES.map((c) => (
-                <Chip key={c.id} label={c.label} icon={c.emoji} selected={draft.category === c.id} onPress={() => setDraft({ ...draft, category: c.id as NewExpense['category'] })} size="sm" />
-              ))}
-            </View>
-            <View style={styles.row}>
-              {(['BOB', 'USD', 'EUR'] as const).map((cur) => (
+            <CategoryPicker selected={draft.category} onSelect={(id) => setDraft({ ...draft, category: id as NewExpense['category'] })} />
+            <View style={[styles.row, styles.currencyGrid]}>
+              {SUPPORTED_CURRENCIES.map((cur) => (
                 <Chip key={cur} label={cur} selected={draft.currency === cur} onPress={() => setDraft({ ...draft, currency: cur })} size="sm" />
               ))}
             </View>
@@ -96,7 +93,7 @@ const styles = StyleSheet.create({
   confidenceTrack: { height: 6, borderRadius: 3, backgroundColor: '#E6E9F2', overflow: 'hidden' },
   confidenceFill: { height: 6, borderRadius: 3, backgroundColor: '#0EB07B' },
   editBox: { width: '100%', gap: Spacing.two, marginTop: Spacing.two },
-  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   row: { flexDirection: 'row', gap: 8 },
+  currencyGrid: { flexWrap: 'wrap' },
   actions: { flexDirection: 'row', gap: Spacing.three, width: '100%', marginTop: Spacing.two },
 });

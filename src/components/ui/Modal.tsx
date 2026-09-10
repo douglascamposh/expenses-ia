@@ -1,4 +1,5 @@
 import { Modal as RNModal, Pressable, StyleSheet, View, KeyboardAvoidingView, Platform, useColorScheme } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { Text } from './Text';
 import { Button } from './Button';
@@ -26,6 +27,7 @@ type Props = {
  */
 export function Modal({ visible, variant = 'center', animation = 'fade', overlayOpacity = 0.4, showHandle, dismissOnOverlayPress = true, onDismiss, children }: Props) {
   const scheme = useColorScheme();
+  const insets = useSafeAreaInsets();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
 
   const overlayBg = `rgba(15,23,42,${overlayOpacity})`;
@@ -33,7 +35,18 @@ export function Modal({ visible, variant = 'center', animation = 'fade', overlay
   if (variant === 'fullscreen') {
     return (
       <RNModal visible={visible} animationType={animation === 'none' ? 'none' : animation} transparent statusBarTranslucent onRequestClose={onDismiss}>
-        <View style={[styles.fullscreen, { backgroundColor: colors.background }]}>{children}</View>
+        <View
+          style={[
+            styles.fullscreen,
+            {
+              backgroundColor: colors.background,
+              // El footer no debe quedar bajo los botones virtuales de Android
+              paddingBottom: Math.max(insets.bottom, Spacing.four),
+            },
+          ]}
+        >
+          {children}
+        </View>
       </RNModal>
     );
   }
@@ -82,9 +95,9 @@ export function AlertModal({ visible, icon, title, description, primaryLabel = '
         <Text variant="smallBold" align="center">{title}</Text>
         {description && <Text variant="small" color="textSecondary" align="center">{description}</Text>}
         <View style={styles.alertActions}>
-          {onSecondary && <Button variant="neutral" size="md" onPress={onSecondary ?? (() => {})}>{secondaryLabel}</Button>}
-          {onPrimary && <Button variant={variant === 'danger' ? 'danger' : 'primary'} size="md" onPress={onPrimary}>{primaryLabel}</Button>}
-          {!onSecondary && !onPrimary && secondaryLabel && <Button variant="neutral" size="md" onPress={onDismiss ?? (() => {})}>{secondaryLabel}</Button>}
+          {onSecondary && <Button variant="neutral" size="md" style={{ flex: 1 }} onPress={onSecondary ?? (() => {})}>{secondaryLabel}</Button>}
+          {onPrimary && <Button variant={variant === 'danger' ? 'danger' : 'primary'} size="md" style={{ flex: 1 }} onPress={onPrimary}>{primaryLabel}</Button>}
+          {!onSecondary && !onPrimary && secondaryLabel && <Button variant="neutral" size="md" style={{ flex: 1 }} onPress={onDismiss ?? (() => {})}>{secondaryLabel}</Button>}
         </View>
       </View>
     </Modal>

@@ -4,7 +4,19 @@ const currencySymbols: Record<Currency, string> = {
   BOB: 'Bs',
   USD: '$',
   EUR: '€',
+  ARS: '$',
+  BRL: 'R$',
+  CLP: '$',
+  COP: '$',
+  MXN: '$',
+  PEN: 'S/',
+  PYG: '₲',
+  UYU: '$U',
 };
+
+export function getCurrencySymbol(currency: Currency): string {
+  return currencySymbols[currency] ?? currency;
+}
 
 export function formatCurrency(amount: number, currency: Currency): string {
   const symbol = currencySymbols[currency] ?? currency;

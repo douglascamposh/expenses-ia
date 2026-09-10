@@ -3,6 +3,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { DashboardScreen } from '../index';
 import expensesReducer, { setPendingQueue } from '@/store/expensesSlice';
+import settingsReducer from '@/store/settingsSlice';
 import { ExpenseCategory } from '@/expenses/categories/expenseCategories';
 import type { NewExpense } from '@/expenses/models/Expense';
 
@@ -31,14 +32,14 @@ jest.mock('@/hooks/use-analyze-audio', () => ({
 }));
 
 const drafts: NewExpense[] = [
-  { amount: 250, currency: 'BOB', category: ExpenseCategory.FOOD, description: 'Comida', date: '2026-09-07' },
-  { amount: 10, currency: 'BOB', category: ExpenseCategory.TRANSPORT, description: 'Bus', date: '2026-09-07' },
+  { amount: 250, currency: 'BOB', category: ExpenseCategory.FOOD, description: 'Comida', date: '2026-09-07', paymentMethod: 'CASH' },
+  { amount: 10, currency: 'BOB', category: ExpenseCategory.TRANSPORT, description: 'Bus', date: '2026-09-07', paymentMethod: 'CASH' },
 ];
 
 describe('repro: flujo Save completo en Dashboard', () => {
   it('Save guarda en repo y limpia la cola sin crash', async () => {
     const testStore = configureStore({
-      reducer: { expenses: expensesReducer },
+      reducer: { expenses: expensesReducer, settings: settingsReducer },
       middleware: (g) => g({ serializableCheck: false }),
     });
     const { getAllByText, queryByText } = render(

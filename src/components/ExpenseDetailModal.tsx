@@ -1,12 +1,13 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Calendar, MoreHorizontal } from 'lucide-react-native';
-import { Text, Button, Input, Chip } from '@/components/ui';
+import { Pressable, View, StyleSheet } from 'react-native';
+import { Calendar, ChevronLeft, MoreHorizontal } from 'lucide-react-native';
+import { Text, Button } from '@/components/ui';
 import { Modal } from '@/components/ui/Modal';
 import { DeleteConfirm } from '@/components/DeleteConfirm';
+import { EditExpenseModal } from '@/components/EditExpenseModal';
 import { Spacing } from '@/constants/theme';
-import { EXPENSE_CATEGORIES, getCategoryConfig } from '@/expenses/categories/expenseCategories';
+import { getCategoryConfig } from '@/expenses/categories/expenseCategories';
 import type { Expense } from '@/expenses/models/Expense';
 import { formatCurrency } from '@/expenses/utils/format';
 
@@ -27,7 +28,9 @@ export function ExpenseDetailModal({ expense, visible, onClose, onDelete, onEdit
     <>
       <Modal visible={visible} variant="center" animation="fade" onDismiss={onClose}>
         <View style={styles.headerBar}>
-          <Button variant="neutral" size="sm" onPress={onClose} style={{ borderWidth: 0, backgroundColor: 'transparent' }}>{'‹'}</Button>
+          <Pressable accessibilityRole="button" accessibilityLabel="Volver" onPress={onClose} style={styles.backBtn}>
+            <ChevronLeft size={22} color="#0F172A" />
+          </Pressable>
           <View style={styles.headerIcon}>
             <MoreHorizontal size={20} color="#64748B" />
           </View>
@@ -48,34 +51,18 @@ export function ExpenseDetailModal({ expense, visible, onClose, onDelete, onEdit
           <Text variant="small" color="textSecondary">{new Date(expense.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</Text>
         </View>
 
-        {editing ? (
-          <View style={styles.editBox}>
-            <Text variant="smallBold">Edit expense</Text>
-            <Input label="Amount" value={String(draft.amount)} onChangeText={(t) => setDraft({ ...draft, amount: parseFloat(t) || 0 })} keyboardType="numeric" />
-            <Text variant="small" color="textSecondary">Currency</Text>
-            <View style={styles.row}>
-              {(['BOB', 'USD', 'EUR'] as const).map((cur) => (
-                <Chip key={cur} label={cur} selected={draft.currency === cur} onPress={() => setDraft({ ...draft, currency: cur })} size="sm" />
-              ))}
-            </View>
-            <Text variant="small" color="textSecondary">Category</Text>
-            <View style={styles.categoryGrid}>
-              {EXPENSE_CATEGORIES.map((c) => (
-                <Chip key={c.id} label={c.label} icon={c.emoji} selected={draft.category === c.id} onPress={() => setDraft({ ...draft, category: c.id as typeof draft.category })} size="sm" />
-              ))}
-            </View>
-            <Input label="Description" value={draft.description} onChangeText={(t) => setDraft({ ...draft, description: t })} />
-            <Input label="Date" value={draft.date} onChangeText={(t) => setDraft({ ...draft, date: t })} placeholder="YYYY-MM-DD" />
-            <Button variant="primary" size="md" fullWidth loading={saving} onPress={() => onEdit({ amount: draft.amount, description: draft.description, category: draft.category, currency: draft.currency, date: draft.date })}>Save</Button>
-            <Button variant="ghost" size="md" fullWidth onPress={() => setEditing(false)}>Cancel</Button>
-          </View>
-        ) : (
-          <View style={styles.actions}>
-            <Button variant="ghost" size="md" onPress={() => setEditing(true)}>Edit</Button>
-            <Button variant="dangerOutline" size="md" onPress={() => setShowDelete(true)}>Delete</Button>
-          </View>
-        )}
+        <View style={styles.actions}>
+          <Button variant="ghost" size="md" style={{ flex: 1 }} onPress={() => setEditing(true)}>Edit</Button>
+          <Button variant="dangerOutline" size="md" style={{ flex: 1 }} onPress={() => setShowDelete(true)}>Delete</Button>
+        </View>
       </Modal>
+      <EditExpenseModal
+        visible={editing}
+        expense={draft}
+        saving={saving}
+        onClose={() => setEditing(false)}
+        onSave={(patch) => { setEditing(false); onEdit(patch); }}
+      />
       <DeleteConfirm visible={showDelete} onCancel={() => setShowDelete(false)} onDelete={() => { setShowDelete(false); onDelete(expense.id); }} />
     </>
   );
@@ -83,14 +70,12 @@ export function ExpenseDetailModal({ expense, visible, onClose, onDelete, onEdit
 
 const styles = StyleSheet.create({
   headerBar: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center' },
+  backBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   headerIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   iconWrap: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   emoji: { fontSize: 36 },
   badgeRow: { flexDirection: 'row', gap: 8 },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: '#EEF2FF', borderWidth: 1, borderColor: '#E6E9F2' },
   dateRow: { flexDirection: 'row', gap: 6, alignItems: 'center', marginTop: 4 },
-  editBox: { width: '100%', gap: Spacing.two },
-  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  row: { flexDirection: 'row', gap: 8 },
   actions: { flexDirection: 'row', gap: Spacing.three, width: '100%', marginTop: Spacing.two },
 });

@@ -46,10 +46,54 @@ export const EXPENSE_CATEGORIES: CategoryConfig[] = [
 
 const MAP = new Map(EXPENSE_CATEGORIES.map((c) => [c.id, c]));
 
+/** Personalizadas (las carga categoriesSlice desde SQLite al arrancar). */
+let customCategories: CategoryConfig[] = [];
+
+export function setCustomCategories(list: CategoryConfig[]): void {
+  customCategories = (list ?? []).filter(Boolean);
+}
+
+/** Por defecto + personalizadas (para pickers y listas). */
+export function getAllCategories(): CategoryConfig[] {
+  return [...EXPENSE_CATEGORIES, ...customCategories];
+}
+
+function findConfig(id: string): CategoryConfig | undefined {
+  if (MAP.has(id as ExpenseCategory)) return MAP.get(id as ExpenseCategory);
+  return customCategories.find((c) => c.id === (id as ExpenseCategory));
+}
+
+const LABELS_ES: Record<ExpenseCategory, string> = {
+  [ExpenseCategory.FOOD]: 'Comida',
+  [ExpenseCategory.TRANSPORT]: 'Transporte',
+  [ExpenseCategory.GROCERIES]: 'Supermercado',
+  [ExpenseCategory.SHOPPING]: 'Compras',
+  [ExpenseCategory.CLOTHING]: 'Ropa',
+  [ExpenseCategory.ENTERTAINMENT]: 'Entretenimiento',
+  [ExpenseCategory.GAMES]: 'Juegos',
+  [ExpenseCategory.HEALTH]: 'Salud',
+  [ExpenseCategory.BILLS]: 'Servicios',
+  [ExpenseCategory.HOME]: 'Hogar',
+  [ExpenseCategory.EDUCATION]: 'Educación',
+  [ExpenseCategory.TRAVEL]: 'Viajes',
+  [ExpenseCategory.OTHER]: 'Otros',
+};
+
 export function getCategoryConfig(id: string): CategoryConfig {
-  return MAP.get(id as ExpenseCategory) ?? MAP.get(ExpenseCategory.OTHER)!;
+  return findConfig(id) ?? MAP.get(ExpenseCategory.OTHER)!;
+}
+
+/** Etiqueta de categoría en el idioma dado (base para textos de embedding). */
+export function getCategoryLabel(id: string, lang: 'es' | 'en' = 'en'): string {
+  const custom = customCategories.find((c) => c.id === (id as ExpenseCategory));
+  if (custom) return custom.label;
+  const key = (Object.values(ExpenseCategory) as string[]).includes(id)
+    ? (id as ExpenseCategory)
+    : ExpenseCategory.OTHER;
+  if (lang === 'es') return LABELS_ES[key];
+  return MAP.get(key)?.label ?? key;
 }
 
 export function isValidCategory(id: string): boolean {
-  return MAP.has(id as ExpenseCategory);
+  return MAP.has(id as ExpenseCategory) || customCategories.some((c) => c.id === (id as ExpenseCategory));
 }

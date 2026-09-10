@@ -1,4 +1,4 @@
-import { InMemoryExpenseRepository } from '../ExpenseRepository';
+import { InMemoryExpenseRepository, rowToExpense } from '../ExpenseRepository';
 import type { Expense } from '../../models/Expense';
 import { ExpenseCategory } from '../../categories/expenseCategories';
 
@@ -10,6 +10,7 @@ function makeExpense(overrides: Partial<Expense> = {}): Expense {
     category: ExpenseCategory.FOOD,
     description: 'Lunch',
     date: '2026-09-04',
+    paymentMethod: 'CASH',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...overrides,
@@ -66,6 +67,36 @@ describe('InMemoryExpenseRepository', () => {
     const summary = await repo.getCategorySummary();
     const food = summary.find((s) => s.category === ExpenseCategory.FOOD);
     expect(food?.total).toBe(50);
+  });
+
+  it('create/getById conserva paymentMethod CARD', async () => {
+    const repo = new InMemoryExpenseRepository();
+    const e = makeExpense({ paymentMethod: 'CARD' });
+    await repo.create(e);
+    expect((await repo.getById(e.id))?.paymentMethod).toBe('CARD');
+  });
+
+  it('rowToExpense: fila vieja sin payment_method → CASH', () => {
+    const e = rowToExpense({
+      id: 'x', amount: 10, currency: 'BOB', category: 'FOOD', description: 'Viejo',
+      date: '2026-01-01', confidence: null, created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z',
+    });
+    expect(e.paymentMethod).toBe('CASH');
+  });
+
+  it('rowToExpense: valor inválido → CASH, CARD se conserva', () => {
+    const bad = rowToExpense({
+      id: 'y', amount: 10, currency: 'BOB', category: 'FOOD', description: 'Raro',
+      date: '2026-01-01', payment_method: 'BITCOIN', confidence: null,
+      created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z',
+    });
+    expect(bad.paymentMethod).toBe('CASH');
+    const card = rowToExpense({
+      id: 'z', amount: 10, currency: 'BOB', category: 'FOOD', description: 'Ok',
+      date: '2026-01-01', payment_method: 'CARD', confidence: null,
+      created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z',
+    });
+    expect(card.paymentMethod).toBe('CARD');
   });
 
   it('no suma monedas diferentes', async () => {

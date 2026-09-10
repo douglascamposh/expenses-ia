@@ -1,5 +1,5 @@
 import { getDatabase } from '@/database/sqlite';
-import type { Expense } from '../models/Expense';
+import { isValidPaymentMethod, type Expense } from '../models/Expense';
 
 export interface ExpenseRepository {
   create(expense: Expense): Promise<Expense>;
@@ -13,7 +13,8 @@ export interface ExpenseRepository {
   clearAll(): Promise<void>;
 }
 
-function rowToExpense(row: Record<string, unknown>): Expense {
+export function rowToExpense(row: Record<string, unknown>): Expense {
+  const rawMethod = row.payment_method as string | null | undefined;
   return {
     id: row.id as string,
     amount: row.amount as number,
@@ -21,6 +22,7 @@ function rowToExpense(row: Record<string, unknown>): Expense {
     category: row.category as Expense['category'],
     description: row.description as string,
     date: row.date as string,
+    paymentMethod: rawMethod && isValidPaymentMethod(rawMethod) ? rawMethod : 'CASH',
     confidence: (row.confidence as number | null) ?? undefined,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
@@ -31,9 +33,9 @@ export class SqliteExpenseRepository implements ExpenseRepository {
   async create(expense: Expense): Promise<Expense> {
     const db = await getDatabase();
     await db.runAsync(
-      `INSERT INTO expenses (id, amount, currency, category, description, date, confidence, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [expense.id, expense.amount, expense.currency, expense.category, expense.description, expense.date, expense.confidence ?? null, expense.createdAt, expense.updatedAt],
+      `INSERT INTO expenses (id, amount, currency, category, description, date, payment_method, confidence, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [expense.id, expense.amount, expense.currency, expense.category, expense.description, expense.date, expense.paymentMethod ?? 'CASH', expense.confidence ?? null, expense.createdAt, expense.updatedAt],
     );
     return expense;
   }
@@ -97,8 +99,8 @@ export class SqliteExpenseRepository implements ExpenseRepository {
       updatedAt: new Date().toISOString(),
     };
     await db.runAsync(
-      `UPDATE expenses SET amount = ?, currency = ?, category = ?, description = ?, date = ?, confidence = ?, updated_at = ? WHERE id = ?`,
-      [updated.amount, updated.currency, updated.category, updated.description, updated.date, updated.confidence ?? null, updated.updatedAt, id],
+      `UPDATE expenses SET amount = ?, currency = ?, category = ?, description = ?, date = ?, payment_method = ?, confidence = ?, updated_at = ? WHERE id = ?`,
+      [updated.amount, updated.currency, updated.category, updated.description, updated.date, updated.paymentMethod ?? 'CASH', updated.confidence ?? null, updated.updatedAt, id],
     );
     return updated;
   }

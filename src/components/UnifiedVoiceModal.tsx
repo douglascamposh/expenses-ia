@@ -4,10 +4,14 @@ import { ActivityIndicator, Pressable, StyleSheet, View, ScrollView } from 'reac
 import { Check, Mic, Square, X } from 'lucide-react-native';
 import { Text, Button, Chip, Input } from '@/components/ui';
 import { Modal } from '@/components/ui/Modal';
+import { CategoryPicker } from '@/components/CategoryPicker';
 import { Spacing } from '@/constants/theme';
-import { EXPENSE_CATEGORIES, getCategoryConfig } from '@/expenses/categories/expenseCategories';
-import type { NewExpense } from '@/expenses/models/Expense';
+import { getCategoryConfig } from '@/expenses/categories/expenseCategories';
+import { SUPPORTED_CURRENCIES, type NewExpense, type PaymentMethod } from '@/expenses/models/Expense';
+import { getPaymentEmoji, getPaymentLabel } from '@/expenses/models/Expense';
 import { formatCurrency } from '@/expenses/utils/format';
+
+const PAYMENT_METHODS: readonly PaymentMethod[] = ['CASH', 'CARD'];
 
 type Phase = 'recording' | 'analyzing' | 'results';
 
@@ -139,14 +143,15 @@ export function UnifiedVoiceModal({ visible, phase, expenses, onStop, onClose, o
                   <View style={styles.editBox}>
                     <Input value={String(draft.amount)} onChangeText={(t) => updateDraft(index, { amount: parseFloat(t) || 0 })} keyboardType="numeric" placeholder="Amount" />
                     <Input value={draft.description} onChangeText={(t) => updateDraft(index, { description: t })} placeholder="Description" />
-                    <View style={styles.categoryGrid}>
-                      {EXPENSE_CATEGORIES.map((c) => (
-                        <Chip key={c.id} label={c.label} icon={c.emoji} selected={draft.category === c.id} onPress={() => updateDraft(index, { category: c.id as NewExpense['category'] })} size="sm" />
+                    <CategoryPicker selected={draft.category} onSelect={(id) => updateDraft(index, { category: id as NewExpense['category'] })} />
+                    <View style={[styles.row, styles.currencyGrid]}>
+                      {SUPPORTED_CURRENCIES.map((cur) => (
+                        <Chip key={cur} label={cur} selected={draft.currency === cur} onPress={() => updateDraft(index, { currency: cur })} size="sm" />
                       ))}
                     </View>
                     <View style={styles.row}>
-                      {(['BOB', 'USD', 'EUR'] as const).map((cur) => (
-                        <Chip key={cur} label={cur} selected={draft.currency === cur} onPress={() => updateDraft(index, { currency: cur })} size="sm" />
+                      {PAYMENT_METHODS.map((m) => (
+                        <Chip key={m} label={getPaymentLabel(m)} icon={getPaymentEmoji(m)} selected={(draft.paymentMethod ?? 'CASH') === m} onPress={() => updateDraft(index, { paymentMethod: m })} size="sm" />
                       ))}
                     </View>
                     <Input value={draft.date} onChangeText={(t) => updateDraft(index, { date: t })} placeholder="YYYY-MM-DD" />
@@ -199,8 +204,8 @@ const styles = StyleSheet.create({
   track: { height: 6, borderRadius: 3, backgroundColor: '#E6E9F2', overflow: 'hidden' },
   fill: { height: 6, borderRadius: 3 },
   editBox: { gap: Spacing.two, marginTop: Spacing.one },
-  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   row: { flexDirection: 'row', gap: 8 },
+  currencyGrid: { flexWrap: 'wrap' },
   cardActions: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.one },
   resultsFooter: { gap: Spacing.two, paddingTop: Spacing.two, borderTopWidth: 1, borderColor: '#E6E9F2' },
 });

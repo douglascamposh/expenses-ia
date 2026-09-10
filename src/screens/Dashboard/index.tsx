@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { BarChart3, ChevronDown, Settings as SettingsIcon } from 'lucide-react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BarChart3, ChevronDown, Plus, Settings as SettingsIcon } from 'lucide-react-native';
 import { ThemedView } from '@/components/themed-view';
 import { EmptyState } from '@/components/EmptyState';
 import { ExpenseCard } from '@/components/ExpenseCard';
 import { ExpenseDetailModal } from '@/components/ExpenseDetailModal';
+import { ManualExpenseModal } from '@/components/ManualExpenseModal';
+import { UnifiedCategories } from '@/components/UnifiedCategories';
 import { UnifiedVoiceModal } from '@/components/UnifiedVoiceModal';
 import { VoiceButton } from '@/components/VoiceButton';
 import { Text, Button, Chip } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { getCategoryConfig } from '@/expenses/categories/expenseCategories';
+import { isValidCurrency } from '@/expenses/models/Expense';
 import type { NewExpense } from '@/expenses/models/Expense';
 import { validateExpenseCommand } from '@/expenses/services/ExpenseService';
 import { formatCurrency, formatMonthLabel } from '@/expenses/utils/format';
@@ -20,6 +23,7 @@ import { useAnalyzeAudio } from '@/hooks/use-analyze-audio';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   clearPending,
+  createExpense,
   deleteExpense,
   fetchExpenses,
   saveAllExpenses,
@@ -41,8 +45,20 @@ export function DashboardScreen() {
   const pendingQueue = useAppSelector((s) => s.expenses.pendingQueue ?? []);
   const saving = useAppSelector((s) => s.expenses.saving);
   const saveError = useAppSelector((s) => s.expenses.saveError);
+  const budgets = useAppSelector((s) => s.expenses.budgets ?? []);
+  const defaultCurrency = useAppSelector((s) => s.settings.defaultCurrency);
+  const insets = useSafeAreaInsets();
+  // Mic flotante encima del tab bar, sin tocarlo (tab iOS ~49 / Android ~70 + aire 12).
+  const micBottom = insets.bottom + (Platform.OS === 'ios' ? 61 : 82);
+  /** Moneda válida o la por defecto (nunca entra inválida a la cola). */
+  const normalizeCurrency = useCallback(
+    (c: unknown): NewExpense['currency'] =>
+      typeof c === 'string' && isValidCurrency(c) ? c : defaultCurrency,
+    [defaultCurrency],
+  );
   const refresh = useCallback(() => dispatch(fetchExpenses(10)).unwrap(), [dispatch]);
   const [selected, setSelected] = useState<import('@/expenses/models/Expense').Expense | null>(null);
+  const [manualVisible, setManualVisible] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
 
   useEffect(() => {
@@ -53,12 +69,13 @@ export function DashboardScreen() {
     if (saveError) Alert.alert('No se pudo guardar', saveError);
   }, [saveError]);
 
-  const voiceState = (() => {
-    if (audio.isRecording) return 'recording' as const;
-    if (audio.state === 'processing' || analyzer.isLoading) return 'processing' as const;
-    if (analyzer.status === 'loading') return 'understanding' as const;
-    return 'idle' as const;
-  })();
+  const voiceButtonState = audio.isRecording
+    ? 'recording' as const
+    : audio.state === 'processing' || analyzer.isLoading
+      ? 'processing' as const
+      : analyzer.status === 'loading'
+        ? 'understanding' as const
+        : 'idle' as const;
 
   const unifiedPhase = audio.isRecording ? 'recording' as const : analyzer.isLoading ? 'analyzing' as const : (pendingQueue ?? []).length > 0 ? 'results' as const : null;
   const unifiedVisible = !!unifiedPhase;
@@ -91,10 +108,13 @@ export function DashboardScreen() {
               action: 'CREATE_EXPENSE',
               expense: {
                 amount: Number((raw as Record<string, unknown>).amount),
-                currency: String((raw as Record<string, unknown>).currency || 'BOB'),
+                currency: normalizeCurrency((raw as Record<string, unknown>).currency),
                 category: String((raw as Record<string, unknown>).category || 'OTHER'),
                 description: String((raw as Record<string, unknown>).description || 'Gasto'),
                 date: String((raw as Record<string, unknown>).date || new Date().toISOString().split('T')[0]),
+                // El backend envía paymentMethod (CASH/CARD); default CASH si falta.
+                // Editable en el modal antes de guardar.
+                paymentMethod: String((raw as Record<string, unknown>).paymentMethod || 'CASH'),
                 confidence: (raw as Record<string, unknown>).confidence as number | undefined,
               },
             };
@@ -103,10 +123,11 @@ export function DashboardScreen() {
             else
               queue.push({
                 amount: Number((raw as Record<string, unknown>).amount) || 0,
-                currency: (String((raw as Record<string, unknown>).currency) as NewExpense['currency']) || 'BOB',
+                currency: normalizeCurrency((raw as Record<string, unknown>).currency),
                 category: (String((raw as Record<string, unknown>).category) as NewExpense['category']) || 'OTHER',
                 description: String((raw as Record<string, unknown>).description || ''),
                 date: String((raw as Record<string, unknown>).date || new Date().toISOString().split('T')[0]),
+                paymentMethod: 'CASH',
               });
           }
           dispatch(setPendingQueue(queue));
@@ -118,7 +139,7 @@ export function DashboardScreen() {
       analyzer.reset();
       await audio.startRecording();
     }
-  }, [audio, analyzer, dispatch]);
+  }, [audio, analyzer, dispatch, normalizeCurrency]);
 
   const handleSaveOne = useCallback(
     (index: number, e: NewExpense) => {
@@ -160,19 +181,24 @@ export function DashboardScreen() {
     [dispatch],
   );
 
+  const handleSaveManual = useCallback(
+    (draft: NewExpense) => {
+      // Snapshot serializable; el thunk createExpense guarda en SQLite y refresca.
+      // El modal solo se cierra si el guardado cumple (saveError se muestra vía useEffect).
+      const snapshot = JSON.parse(JSON.stringify(draft)) as NewExpense;
+      void dispatch(createExpense(snapshot))
+        .unwrap()
+        .then(() => setManualVisible(false))
+        .catch(() => {});
+    },
+    [dispatch],
+  );
+
+  // ExpenseDetailModal ya confirma con DeleteConfirm (mockup) antes de llamar aquí.
   const handleDelete = useCallback(
     async (id: string) => {
-      Alert.alert('Eliminar gasto?', 'Esta acción no se puede deshacer.', [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => {
-            setSelected(null);
-            void dispatch(deleteExpense(id)).unwrap().catch(() => {});
-          },
-        },
-      ]);
+      setSelected(null);
+      void dispatch(deleteExpense(id)).unwrap().catch(() => {});
     },
     [dispatch],
   );
@@ -180,10 +206,10 @@ export function DashboardScreen() {
   const safeTotalMonth = totalMonth ?? {};
   const totalsByCurrency = Object.entries(safeTotalMonth);
   const monthTotalPrimary = (() => {
-    if (safeTotalMonth['BOB'] !== undefined) return formatCurrency(safeTotalMonth['BOB'], 'BOB');
+    if (safeTotalMonth[defaultCurrency] !== undefined) return formatCurrency(safeTotalMonth[defaultCurrency], defaultCurrency);
     const firstKey = Object.keys(safeTotalMonth)[0] as NewExpense['currency'] | undefined;
     if (firstKey) return formatCurrency(safeTotalMonth[firstKey], firstKey);
-    return formatCurrency(0, 'BOB');
+    return formatCurrency(0, defaultCurrency);
   })();
 
   const thisMonthLabel = formatMonthLabel(new Date());
@@ -198,9 +224,14 @@ export function DashboardScreen() {
               <Text variant="smallBold" style={styles.monthText}>{thisMonthLabel}</Text>
               <ChevronDown size={16} color="#0F172A" />
             </Pressable>
-            <Pressable accessibilityLabel="Settings" onPress={() => router.push('/settings' as never)} style={styles.gearBtn}>
-              <SettingsIcon size={18} color="#64748B" />
-            </Pressable>
+            <View style={styles.topBarActions}>
+              <Pressable accessibilityLabel="Agregar gasto manual" onPress={() => setManualVisible(true)} style={styles.gearBtn}>
+                <Plus size={18} color="#2F80FF" />
+              </Pressable>
+              <Pressable accessibilityLabel="Settings" onPress={() => router.push('/settings' as never)} style={styles.gearBtn}>
+                <SettingsIcon size={18} color="#64748B" />
+              </Pressable>
+            </View>
           </View>
 
           {/* Spent this month card - mockup */}
@@ -209,13 +240,10 @@ export function DashboardScreen() {
               <View>
                 <Text variant="small" color="textSecondary">Spent this month</Text>
                 <Text variant="h1" style={styles.spentAmount}>{loading ? '...' : monthTotalPrimary}</Text>
-                <View style={styles.vsRow}>
-                  <Text variant="caption" color="success" weight="600">↓ 12% vs last month</Text>
-                </View>
                 {totalsByCurrency.length > 1 && (
                   <View style={styles.currencyRowSmall}>
                     {totalsByCurrency.map(([cur, total]) => (
-                      <Text key={cur} variant="small" color="textSecondary">{formatCurrency(total, cur as NewExpense['currency'])} {cur !== 'BOB' ? `· ${cur}` : ''}</Text>
+                      <Text key={cur} variant="small" color="textSecondary">{formatCurrency(total, cur as NewExpense['currency'])} {cur !== defaultCurrency ? `· ${cur}` : ''}</Text>
                     ))}
                   </View>
                 )}
@@ -226,68 +254,14 @@ export function DashboardScreen() {
             </View>
           </ThemedView>
 
-          {/* Spending by category - carousel + bars */}
-          <View style={styles.spendingSection}>
-            <View style={styles.cardHeader}>
-              <Text variant="smallBold">Spending by category</Text>
-              <Pressable accessibilityLabel="Ver todas las categorías" onPress={() => router.push('/explore')}>
-                <Text variant="small" color="textSecondary">See all</Text>
-              </Pressable>
-            </View>
-
-            {(summary ?? []).length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carouselRow}>
-                {(summary ?? []).slice(0, 4).map((s) => {
-                  if (!s) return null as unknown as React.JSX.Element;
-                  const cat = getCategoryConfig(s.category);
-                  const totalAll = (summary ?? []).reduce((a, x) => a + (x?.total ?? 0), 0) || 1;
-                  const pct = Math.round(((s.total ?? 0) / totalAll) * 100);
-                  return (
-                    <ThemedView key={`car-${s.category}`} type="backgroundElement" style={styles.carouselCard}>
-                      <View style={[styles.carouselIcon, { backgroundColor: cat.color + '1A', borderColor: cat.color + '33' }]}>
-                        <Text>{cat.emoji}</Text>
-                      </View>
-                      <Text variant="smallBold" style={styles.carouselLabel}>{cat.label}</Text>
-                      <Text variant="small" color="textSecondary">Bs {Math.round(s.total)}</Text>
-                      <Text variant="caption" color="textSecondary">{pct}%</Text>
-                      <View style={styles.carouselBarBg}>
-                        <View style={[styles.carouselBarFill, { backgroundColor: cat.color, width: `${pct}%` as unknown as number }]} />
-                      </View>
-                    </ThemedView>
-                  );
-                })}
-              </ScrollView>
-            )}
-
-            <ThemedView type="backgroundElement" style={styles.cardBars}>
-              {loading ? (
-                <Text color="textSecondary">Cargando...</Text>
-              ) : (summary ?? []).length === 0 ? (
-                <Text color="textSecondary">Sin gastos aún</Text>
-              ) : (
-                (summary ?? []).slice(0, 5).map((s) => {
-                  if (!s) return null as unknown as React.JSX.Element;
-                  const cat = getCategoryConfig(s.category);
-                  const max = Math.max(...(summary ?? []).map((x) => x?.total ?? 0), 1);
-                  const widthPct = ((s.total ?? 0) / max) * 100;
-                  return (
-                    <View key={`${s.category}-${s.currency}`} style={styles.spendingRow}>
-                      <View style={[styles.catIcon, { backgroundColor: cat.color + '1A' }]}>
-                        <Text>{cat.emoji}</Text>
-                      </View>
-                      <View style={styles.spendingMiddle}>
-                        <Text variant="smallBold">{cat.label}</Text>
-                        <View style={styles.barBg}>
-                          <View style={[styles.barFill, { backgroundColor: cat.color, width: `${widthPct}%` as unknown as number }]} />
-                        </View>
-                      </View>
-                      <Text variant="smallBold">{formatCurrency(s.total, s.currency as NewExpense['currency'])}</Text>
-                    </View>
-                  );
-                })
-              )}
-            </ThemedView>
-          </View>
+          {/* Categorías unificadas estilo mockup: cada una sale una sola vez */}
+          <UnifiedCategories
+            loading={loading}
+            budgets={budgets}
+            summary={summary}
+            onOpenCategory={(category) => router.push(`/budgets/${category}` as never)}
+            onSeeAll={() => router.push('/budgets' as never)}
+          />
 
           {/* Filtros básicos -> Chip genérico */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
@@ -340,9 +314,9 @@ export function DashboardScreen() {
           <View style={styles.footerSpace} />
         </ScrollView>
 
-        {/* FAB Voice */}
-        <View style={styles.fabContainer} pointerEvents="box-none">
-          <VoiceButton state={voiceState} onPress={handleVoicePress} disabled={analyzer.isLoading || audio.state === 'processing'} />
+        {/* Mic flotante encima del tab bar, sin tocarlo */}
+        <View style={[styles.micDock, { bottom: micBottom }]} pointerEvents="box-none">
+          <VoiceButton state={voiceButtonState} onPress={handleVoicePress} disabled={analyzer.isLoading || audio.state === 'processing'} />
           {audio.errorMessage && <Text variant="small" color="danger" style={styles.voiceError}>{audio.errorMessage}</Text>}
           {analyzer.error && <Text variant="small" color="danger" style={styles.voiceError}>{analyzer.error}</Text>}
         </View>
@@ -360,6 +334,15 @@ export function DashboardScreen() {
         onSaveAll={handleSaveAll}
         onDismissResults={handleDismissResults}
         saving={saving}
+      />
+
+      {/* Alta manual */}
+      <ManualExpenseModal
+        visible={manualVisible}
+        saving={saving}
+        onClose={() => setManualVisible(false)}
+        onSave={handleSaveManual}
+        defaultCurrency={defaultCurrency}
       />
 
       {/* Detail - genérico */}
@@ -388,31 +371,17 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: Spacing.one },
   monthPicker: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   monthText: { fontSize: 16, textTransform: 'capitalize' },
+  topBarActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   gearBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E6E9F2' },
+  micDock: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 6, zIndex: 10 },
   // Spent card
   spentCard: { borderRadius: 16, padding: Spacing.three, borderWidth: 1, borderColor: '#E6E9F2', backgroundColor: '#FFFFFF', shadowColor: 'rgba(45,125,255,0.08)', shadowOpacity: 1, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
   spentTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   spentAmount: { fontSize: 28, fontWeight: '800', color: '#0F172A', marginTop: 2 },
-  vsRow: { marginTop: 4 },
   vsText: { color: '#0EB07B', fontSize: 12, fontWeight: '600' },
   currencyRowSmall: { flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap', marginTop: 4 },
   chartIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E6E9F2' },
   // Spending
-  spendingSection: { gap: Spacing.three },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  carouselRow: { gap: Spacing.two, paddingVertical: 4 },
-  carouselCard: { width: 78, borderRadius: 12, padding: 10, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#E6E9F2' },
-  carouselIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  carouselLabel: { fontSize: 11, textAlign: 'center' },
-  carouselPct: { fontSize: 11, color: '#64748B' },
-  carouselBarBg: { height: 4, borderRadius: 2, backgroundColor: '#E6E9F2', overflow: 'hidden', width: '100%', marginTop: 2 },
-  carouselBarFill: { height: 4, borderRadius: 2 },
-  cardBars: { borderRadius: 16, padding: Spacing.three, gap: Spacing.two, borderWidth: 1, borderColor: '#E6E9F2', backgroundColor: '#FFFFFF' },
-  spendingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  catIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  spendingMiddle: { flex: 1, gap: 6 },
-  barBg: { height: 6, borderRadius: 3, backgroundColor: '#E6E9F2', overflow: 'hidden' },
-  barFill: { height: 6, borderRadius: 3 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.two },
   sectionHeaderRight: { flexDirection: 'row', gap: Spacing.three, alignItems: 'center' },
   filterRow: { flexDirection: 'row', gap: Spacing.two, paddingVertical: Spacing.one },
@@ -424,7 +393,6 @@ const styles = StyleSheet.create({
   emptyHint: { textAlign: 'center' },
   error: { color: '#EF4444' },
   retry: { padding: 8, borderWidth: 1, borderColor: '#E6E9F2', borderRadius: 999, paddingHorizontal: 16 },
-  fabContainer: { position: 'absolute', bottom: 12, left: 0, right: 0, alignItems: 'center', gap: 6, zIndex: 10 },
   analyzingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.12)', justifyContent: 'center', alignItems: 'center', padding: Spacing.four },
   analyzingCard: { borderRadius: 16, padding: Spacing.four, gap: Spacing.one, alignItems: 'center', borderWidth: 1, borderColor: '#E6E9F2', backgroundColor: '#FFFFFF', shadowColor: 'rgba(45,125,255,0.12)', shadowRadius: 12, elevation: 4 },
   voiceError: { color: '#EF4444', textAlign: 'center', paddingHorizontal: Spacing.four },

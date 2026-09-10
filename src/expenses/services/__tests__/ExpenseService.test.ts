@@ -54,4 +54,22 @@ describe('validateExpenseCommand', () => {
     const res = validateExpenseCommand({ amount: 20, currency: 'BOB', category: ExpenseCategory.TRANSPORT, description: 'Taxi', date: '2026-09-04' });
     expect(res.valid).toBe(true);
   });
+
+  it('paymentMethod ausente → default CASH', () => {
+    const res = validateExpenseCommand({ ...base });
+    expect(res.valid).toBe(true);
+    expect(res.normalized?.paymentMethod).toBe('CASH');
+  });
+
+  it('paymentMethod CARD válido → se conserva', () => {
+    const res = validateExpenseCommand({ ...base, expense: { ...base.expense, paymentMethod: 'CARD' } });
+    expect(res.valid).toBe(true);
+    expect(res.normalized?.paymentMethod).toBe('CARD');
+  });
+
+  it('paymentMethod inválido → rejected', () => {
+    const res = validateExpenseCommand({ ...base, expense: { ...base.expense, paymentMethod: 'BITCOIN' } });
+    expect(res.valid).toBe(false);
+    expect(res.errors.join(' ')).toMatch(/paymentMethod/);
+  });
 });

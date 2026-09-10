@@ -82,6 +82,7 @@ jest.mock('expo-sqlite', () => ({
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
+  useLocalSearchParams: jest.fn(() => ({})),
   useFocusEffect: jest.fn((cb: () => void) => {
     try {
       const cleanup = cb();
@@ -92,6 +93,18 @@ jest.mock('expo-router', () => ({
   }),
   Link: ({ children }: { children: React.ReactNode }) => children,
 }));
+
+// react-native-safe-area-context mock — insets en cero sin provider nativo
+jest.mock('react-native-safe-area-context', () => {
+  const { View } = require('react-native');
+  return {
+    SafeAreaProvider: ({ children }) => children,
+    SafeAreaConsumer: ({ children }) => children({ top: 0, bottom: 0, left: 0, right: 0 }),
+    SafeAreaView: View,
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+    useSafeAreaFrame: () => ({ x: 0, y: 0, width: 0, height: 0 }),
+  };
+});
 
 // react-native-reanimated mock — required for jest without worklets runtime
 try {
