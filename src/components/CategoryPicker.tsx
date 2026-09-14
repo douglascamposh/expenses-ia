@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Chip, Text } from '@/components/ui';
 import { getAllCategories } from '@/expenses/categories/expenseCategories';
+import { useTranslation } from '@/i18n/useTranslation';
 
 /** Categorías visibles antes de "Ver más". */
 const VISIBLE_COUNT = 6;
@@ -18,6 +19,7 @@ type Props = {
  * de las primeras.
  */
 export function CategoryPicker({ selected, onSelect }: Props) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const all = getAllCategories();
   const visible = expanded
@@ -40,12 +42,12 @@ export function CategoryPicker({ selected, onSelect }: Props) {
       {(hidden > 0 || expanded) && (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={expanded ? 'Ver menos categorías' : 'Ver más categorías'}
+          accessibilityLabel={expanded ? t('categoryPicker_a11yLess') : t('categoryPicker_a11yMore')}
           onPress={() => setExpanded((v) => !v)}
           style={styles.toggle}
         >
           <Text variant="small" color="primary">
-            {expanded ? 'Ver menos' : `Ver más (${hidden})`}
+            {expanded ? t('categoryPicker_less') : t('categoryPicker_more', { n: hidden })}
           </Text>
         </Pressable>
       )}

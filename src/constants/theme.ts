@@ -10,13 +10,13 @@ import { Platform } from 'react-native';
 export const Colors = {
   light: {
     text: '#0F172A',
-    background: '#EEF2FF',
+    background: '#F4F3F1',
     backgroundElement: '#FFFFFF',
-    backgroundSelected: '#E6EAF9',
+    backgroundSelected: '#EAE8E4',
     textSecondary: '#64748B',
     primary: '#2F80FF',
     primaryDark: '#1A5ECC',
-    border: '#E6E9F2',
+    border: '#E4E2DE',
     success: '#0EB07B',
     warning: '#F59E0B',
     danger: '#EF4444',
@@ -42,19 +42,16 @@ export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
+    /** San Francisco (system default) */
     sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {
-    sans: 'normal',
+    sans: 'system-ui, -apple-system, Roboto, "Segoe UI", sans-serif',
     serif: 'serif',
-    rounded: 'normal',
+    rounded: 'sans-serif',
     mono: 'monospace',
   },
   web: {

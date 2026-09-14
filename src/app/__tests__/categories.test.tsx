@@ -6,13 +6,13 @@ import categoriesReducer from '@/store/categoriesSlice';
 import expensesReducer from '@/store/expensesSlice';
 import settingsReducer from '@/store/settingsSlice';
 
-type Custom = { id: string; label: string; emoji: string; color: string };
+type Custom = { id: string; label: string; emoji: string; color: string; kind?: string };
 let mockCustomStore: Record<string, Custom> = {};
 
 jest.mock('@/expenses/repositories/CategoryRepository', () => ({
   categoryRepository: {
     getCustom: jest.fn(() => Promise.resolve(Object.values(mockCustomStore))),
-    create: jest.fn((input: { label: string; emoji: string; color: string }) => {
+    create: jest.fn((input: { label: string; emoji: string; color: string; kind?: string }) => {
       const id = input.label.toUpperCase().replace(/\s+/g, '_');
       const c = { id, ...input };
       mockCustomStore[id] = c;
@@ -21,6 +21,14 @@ jest.mock('@/expenses/repositories/CategoryRepository', () => ({
     delete: jest.fn((id: string) => {
       delete mockCustomStore[id];
       return Promise.resolve();
+    }),
+    update: jest.fn((id: string, input: { label: string; emoji: string; color: string; kind?: string }) => {
+      const name = input.label.trim().toLowerCase();
+      const clash = Object.values(mockCustomStore).some((c) => c.id !== id && c.label.trim().toLowerCase() === name);
+      if (clash || name === 'otros') return Promise.reject(new Error('Ya existe una categoría con ese nombre'));
+      const c = { id, ...input };
+      mockCustomStore[id] = c;
+      return Promise.resolve(c);
     }),
     clearAll: jest.fn(() => {
       mockCustomStore = {};
@@ -45,23 +53,82 @@ beforeEach(() => {
   mockCustomStore = {};
 });
 
-describe('CategoriesScreen', () => {
-  it('lista las del sistema y el empty de personalizadas', async () => {
-    const { getByText } = renderWithStore();
-    await waitFor(() => expect(getByText('Del sistema')).toBeTruthy());
-    expect(getByText('Food')).toBeTruthy();
-    expect(getByText('Mis categorías')).toBeTruthy();
+describe('CategoriesScreen (categorías del usuario)', () => {
+  it('sin customs muestra empty, sugerencias y nada por defecto', async () => {
+    const { getByText, queryByText } = renderWithStore();
+    await waitFor(() => expect(getByText('Añadir categoría nueva')).toBeTruthy());
     expect(getByText('+ Nueva categoría')).toBeTruthy();
+    expect(getByText('Sugerencias')).toBeTruthy();
+    // Nada por defecto: ni sistema ni legado
+    expect(queryByText('Food')).toBeNull();
+    expect(queryByText('Transport')).toBeNull();
   });
 
-  it('crear con nombre+icono+color aparece en Mis categorías', async () => {
-    const { getByText, getByPlaceholderText } = renderWithStore();
-    await waitFor(() => expect(getByText('Mis categorías')).toBeTruthy());
+  it('crear con nombre+icono+color aparece en Mis categorías como gasto', async () => {
+    const { getByText, getAllByText, getByLabelText, getByPlaceholderText } = renderWithStore();
+    await waitFor(() => expect(getByText('Añadir categoría nueva')).toBeTruthy());
     fireEvent.press(getByText('+ Nueva categoría'));
     await waitFor(() => expect(getByText('Nueva categoría')).toBeTruthy());
     fireEvent.changeText(getByPlaceholderText('Mascotas'), 'Mascotas');
-    fireEvent.press(getByText('Guardar'));
-    await waitFor(() => expect(getByText('Mis categorías (1)')).toBeTruthy());
+    fireEvent.press(getByLabelText('Guardar'));
+    await waitFor(() => expect(getByText('Mascotas')).toBeTruthy());
     expect(getByText('Mascotas')).toBeTruthy();
+    expect(getAllByText('Gasto').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('una sugerencia se añade con Añadir', async () => {
+    const { getByText, getByLabelText } = renderWithStore();
+    await waitFor(() => expect(getByText('Sugerencias')).toBeTruthy());
+    fireEvent.press(getByLabelText('Añadir Comer fuera'));
+    await waitFor(() => expect(getByText('Comer fuera')).toBeTruthy());
+  });
+
+  it('editar una categoría al seleccionarla actualiza el nombre', async () => {
+    const { getByText, getByLabelText, getByPlaceholderText } = renderWithStore();
+    await waitFor(() => expect(getByText('Añadir categoría nueva')).toBeTruthy());
+    fireEvent.press(getByText('+ Nueva categoría'));
+    await waitFor(() => expect(getByText('Nueva categoría')).toBeTruthy());
+    fireEvent.changeText(getByPlaceholderText('Mascotas'), 'Mascotas');
+    fireEvent.press(getByLabelText('Guardar'));
+    await waitFor(() => expect(getByText('Mascotas')).toBeTruthy());
+    fireEvent.press(getByLabelText('Editar Mascotas'));
+    await waitFor(() => expect(getByText('Editar categoría')).toBeTruthy());
+    fireEvent.changeText(getByPlaceholderText('Mascotas'), 'Peludos');
+    fireEvent.press(getByLabelText('Guardar'));
+    await waitFor(() => expect(getByText('Peludos')).toBeTruthy());
+  });
+
+  it('editar con nombre duplicado muestra error y no guarda', async () => {
+    const { getByText, getByLabelText, getByPlaceholderText, queryByText } = renderWithStore();
+    await waitFor(() => expect(getByText('Añadir categoría nueva')).toBeTruthy());
+    fireEvent.press(getByText('+ Nueva categoría'));
+    await waitFor(() => expect(getByText('Nueva categoría')).toBeTruthy());
+    fireEvent.changeText(getByPlaceholderText('Mascotas'), 'Mascotas');
+    fireEvent.press(getByLabelText('Guardar'));
+    await waitFor(() => expect(getByText('Mascotas')).toBeTruthy());
+    // Segunda categoría distinta (botón + del header)
+    fireEvent.press(getByLabelText('Nueva categoría'));
+    await waitFor(() => expect(getByText('Nueva categoría')).toBeTruthy());
+    fireEvent.changeText(getByPlaceholderText('Mascotas'), 'Jardín');
+    fireEvent.press(getByLabelText('Guardar'));
+    await waitFor(() => expect(getByText('Jardín')).toBeTruthy());
+    // Renombrar Jardín → Mascotas debe fallar
+    fireEvent.press(getByLabelText('Editar Jardín'));
+    await waitFor(() => expect(getByText('Editar categoría')).toBeTruthy());
+    fireEvent.changeText(getByPlaceholderText('Mascotas'), 'mascotas');
+    fireEvent.press(getByLabelText('Guardar'));
+    await waitFor(() => expect(getByText('Ya existe una categoría con ese nombre')).toBeTruthy());
+    expect(queryByText('Jardín')).toBeTruthy();
+  });
+
+  it('el formulario muestra iconos en carrusel de tres filas sin Ver más', async () => {
+    const { getByText, getByLabelText, queryByLabelText } = renderWithStore();
+    await waitFor(() => expect(getByText('Añadir categoría nueva')).toBeTruthy());
+    fireEvent.press(getByText('+ Nueva categoría'));
+    await waitFor(() => expect(getByText('Nueva categoría')).toBeTruthy());
+    // Tira horizontal: iconos del inicio y del final visibles sin expandir
+    expect(getByLabelText('Icono 🍔')).toBeTruthy();
+    expect(getByLabelText('Icono 🧺')).toBeTruthy();
+    expect(queryByLabelText('Ver más iconos')).toBeNull();
   });
 });

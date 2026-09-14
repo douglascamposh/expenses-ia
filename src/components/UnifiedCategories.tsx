@@ -98,7 +98,7 @@ export function UnifiedCategories({ loading, budgets, summary, onOpenCategory, o
 const styles = StyleSheet.create({
   section: { gap: Spacing.two },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  card: { borderRadius: 16, padding: Spacing.three, gap: Spacing.three, borderWidth: 1, borderColor: '#E6E9F2', backgroundColor: '#FFFFFF' },
+  card: { borderRadius: 16, padding: Spacing.three, gap: Spacing.three, borderWidth: 1, borderColor: '#E4E2DE', backgroundColor: '#FFFFFF' },
   spentRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   iconBox: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   emoji: { fontSize: 20 },

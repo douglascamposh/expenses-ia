@@ -10,43 +10,72 @@ const base: Expense = {
   category: ExpenseCategory.FOOD,
   description: 'Comida',
   date: '2026-09-07',
-  paymentMethod: 'CARD',
+  paymentMethod: 'CARD', kind: 'EXPENSE',
   createdAt: '2026-09-07T00:00:00.000Z',
   updatedAt: '2026-09-07T00:00:00.000Z',
 };
 
-describe('ExpenseDetailModal (edición en fullscreen)', () => {
-  it('editar abre el modal fullscreen y guardar llama onEdit con el patch', () => {
-    const onEdit = jest.fn();
-    const { getByText, getByDisplayValue } = render(
-      <ExpenseDetailModal expense={base} visible onClose={() => {}} onDelete={() => {}} onEdit={onEdit} saving={false} />,
-    );
-    fireEvent.press(getByText('Edit'));
-    expect(getByText('Editar gasto')).toBeTruthy();
-    fireEvent.changeText(getByDisplayValue('Comida'), 'Cena');
-    fireEvent.press(getByText('Guardar'));
-    expect(onEdit).toHaveBeenCalledTimes(1);
-    expect(onEdit.mock.calls[0][0]).toMatchObject({ description: 'Cena', amount: 35, paymentMethod: 'CARD' });
+function renderModal(props = {}) {
+  return render(
+    <ExpenseDetailModal
+      expense={base}
+      visible
+      onClose={() => {}}
+      onSave={() => {}}
+      {...props}
+    />,
+  );
+}
+
+describe('ExpenseDetailModal (misma interfaz que agregar)', () => {
+  it('muestra el borrador editable y un solo Guardar (sin Edit/Delete)', () => {
+    const { getByDisplayValue, getByLabelText, queryByText } = renderModal();
+    expect(getByDisplayValue('Comida')).toBeTruthy();
+    expect(getByDisplayValue('35')).toBeTruthy();
+    expect(getByLabelText('Guardar')).toBeTruthy();
+    expect(queryByText('Edit')).toBeNull();
+    expect(queryByText('Delete')).toBeNull();
   });
 
-  it('muestra la tarjeta resumen con monto y fecha', () => {
-    const { getByText } = render(
-      <ExpenseDetailModal expense={base} visible onClose={() => {}} onDelete={() => {}} onEdit={() => {}} saving={false} />,
-    );
-    fireEvent.press(getByText('Edit'));
-    expect(getByText('Bs 35.00')).toBeTruthy();
-    expect(getByText(/Food ·/)).toBeTruthy();
+  it('Guardar envía el patch editado', () => {
+    const onSave = jest.fn();
+    const { getByDisplayValue, getByLabelText } = renderModal({ onSave });
+    fireEvent.changeText(getByDisplayValue('Comida'), 'Cena');
+    fireEvent.press(getByLabelText('Otros'));
+    fireEvent.press(getByLabelText('Guardar'));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0][0]).toMatchObject({ description: 'Cena', amount: 35, category: 'OTHER' });
   });
 
-  it('Cancelar cierra sin llamar onEdit', () => {
-    const onEdit = jest.fn();
-    const { getByText, getByDisplayValue, queryByText } = render(
-      <ExpenseDetailModal expense={base} visible onClose={() => {}} onDelete={() => {}} onEdit={onEdit} saving={false} />,
+  it('Cerrar llama onClose', () => {
+    const onClose = jest.fn();
+    const { getAllByLabelText } = renderModal({ onClose });
+    // [0] = backdrop, [último] = botón X del detalle
+    const closers = getAllByLabelText('Cerrar');
+    fireEvent.press(closers[closers.length - 1]);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('sin tag visible: oculta Etiqueta, pago con icono y conserva el tag al guardar', () => {
+    const onSave = jest.fn();
+    const tagged: Expense = { ...base, description: 'Comida #fiesta' };
+    const { getByDisplayValue, getByLabelText, getByText, queryByPlaceholderText } = render(
+      <ExpenseDetailModal expense={tagged} visible onClose={() => {}} onSave={onSave} />,
     );
-    fireEvent.press(getByText('Edit'));
-    fireEvent.changeText(getByDisplayValue('Comida'), 'Cena');
-    fireEvent.press(getByText('Cancelar'));
-    expect(onEdit).not.toHaveBeenCalled();
-    expect(queryByText('Guardar')).toBeNull();
+    // Descripción limpia y sin input de etiqueta
+    expect(getByDisplayValue('Comida')).toBeTruthy();
+    expect(queryByPlaceholderText('Etiqueta')).toBeNull();
+    // Pago con icono en vez de almohadilla (CARD → tarjeta)
+    expect(getByText('tarjeta')).toBeTruthy();
+    fireEvent.press(getByLabelText('Guardar'));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0][0]).toMatchObject({ description: 'Comida #fiesta' });
+  });
+
+  it('sin gasto no renderiza nada', () => {
+    const { queryByLabelText } = render(
+      <ExpenseDetailModal expense={null} visible onClose={() => {}} onSave={() => {}} />,
+    );
+    expect(queryByLabelText('Guardar')).toBeNull();
   });
 });

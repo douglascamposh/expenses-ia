@@ -1,5 +1,5 @@
 import { getDatabase } from '@/database/sqlite';
-import { isValidPaymentMethod, type Expense } from '../models/Expense';
+import { isValidKind, isValidPaymentMethod, type EntryKind, type Expense } from '../models/Expense';
 
 export interface ExpenseRepository {
   create(expense: Expense): Promise<Expense>;
@@ -7,7 +7,13 @@ export interface ExpenseRepository {
   getAll(): Promise<Expense[]>;
   getRecent(limit: number): Promise<Expense[]>;
   getByDateRange(from: string, to: string): Promise<Expense[]>;
-  getCategorySummary(fromDate?: string): Promise<{ category: string; currency: string; total: number }[]>;
+  /** Recientes del rango (mes en curso): solo kind dado, máx. limit, fecha DESC. */
+  getByMonthRange(from: string, to: string, kind: EntryKind, limit: number): Promise<Expense[]>;
+  getCategorySummary(fromDate?: string, kind?: EntryKind, toDate?: string): Promise<{ category: string; currency: string; total: number }[]>;
+  /** Total de gastos por mes (YYYY-MM) y moneda en el rango: alimenta la tira de meses. */
+  getMonthlyTotals(from: string, to: string): Promise<{ month: string; currency: string; total: number }[]>;
+  /** Fecha ISO del gasto más antiguo (para acotar el selector de año). */
+  getOldestDate(): Promise<string | null>;
   delete(id: string): Promise<void>;
   update(id: string, patch: Partial<Omit<Expense, 'id' | 'createdAt'>>): Promise<Expense | null>;
   clearAll(): Promise<void>;
@@ -15,11 +21,13 @@ export interface ExpenseRepository {
 
 export function rowToExpense(row: Record<string, unknown>): Expense {
   const rawMethod = row.payment_method as string | null | undefined;
+  const rawKind = row.kind as string | null | undefined;
   return {
     id: row.id as string,
     amount: row.amount as number,
     currency: row.currency as Expense['currency'],
     category: row.category as Expense['category'],
+    kind: rawKind && isValidKind(rawKind) ? rawKind : 'EXPENSE',
     description: row.description as string,
     date: row.date as string,
     paymentMethod: rawMethod && isValidPaymentMethod(rawMethod) ? rawMethod : 'CASH',
@@ -33,9 +41,9 @@ export class SqliteExpenseRepository implements ExpenseRepository {
   async create(expense: Expense): Promise<Expense> {
     const db = await getDatabase();
     await db.runAsync(
-      `INSERT INTO expenses (id, amount, currency, category, description, date, payment_method, confidence, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [expense.id, expense.amount, expense.currency, expense.category, expense.description, expense.date, expense.paymentMethod ?? 'CASH', expense.confidence ?? null, expense.createdAt, expense.updatedAt],
+      `INSERT INTO expenses (id, amount, currency, category, kind, description, date, payment_method, confidence, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [expense.id, expense.amount, expense.currency, expense.category, expense.kind ?? 'EXPENSE', expense.description, expense.date, expense.paymentMethod ?? 'CASH', expense.confidence ?? null, expense.createdAt, expense.updatedAt],
     );
     return expense;
   }
@@ -64,13 +72,26 @@ export class SqliteExpenseRepository implements ExpenseRepository {
     return (rows ?? []).map(rowToExpense);
   }
 
-  async getCategorySummary(fromDate?: string): Promise<{ category: string; currency: string; total: number }[]> {
+  async getByMonthRange(from: string, to: string, kind: EntryKind, limit: number): Promise<Expense[]> {
     const db = await getDatabase();
-    let sql = 'SELECT category, currency, SUM(amount) as total FROM expenses';
-    const params: (string | number | null)[] = [];
+    const rows = (await db.getAllAsync<Record<string, unknown>>(
+      'SELECT * FROM expenses WHERE date >= ? AND date <= ? AND kind = ? ORDER BY date DESC, created_at DESC LIMIT ?',
+      [from, to, kind, limit],
+    )) ?? [];
+    return (rows ?? []).map(rowToExpense);
+  }
+
+  async getCategorySummary(fromDate?: string, kind: EntryKind = 'EXPENSE', toDate?: string): Promise<{ category: string; currency: string; total: number }[]> {
+    const db = await getDatabase();
+    let sql = 'SELECT category, currency, SUM(amount) as total FROM expenses WHERE kind = ?';
+    const params: (string | number | null)[] = [kind];
     if (fromDate) {
-      sql += ' WHERE date >= ?';
+      sql += ' AND date >= ?';
       params.push(fromDate);
+    }
+    if (toDate) {
+      sql += ' AND date <= ?';
+      params.push(toDate);
     }
     sql += ' GROUP BY category, currency ORDER BY total DESC';
     // No pasar array vacío como bind-params: algunas versiones del puente
@@ -81,6 +102,23 @@ export class SqliteExpenseRepository implements ExpenseRepository {
         : db.getAllAsync<{ category: string; currency: string; total: number }>(sql))
     ) ?? [];
     return (rows ?? []).map((r) => ({ category: r.category, currency: r.currency, total: r.total }));
+  }
+
+  async getMonthlyTotals(from: string, to: string): Promise<{ month: string; currency: string; total: number }[]> {
+    const db = await getDatabase();
+    const rows = (await db.getAllAsync<{ month: string; currency: string; total: number }>(
+      `SELECT substr(date, 1, 7) as month, currency, SUM(amount) as total FROM expenses
+       WHERE kind = 'EXPENSE' AND date >= ? AND date <= ?
+       GROUP BY month, currency ORDER BY month ASC`,
+      [from, to],
+    )) ?? [];
+    return (rows ?? []).map((r) => ({ month: r.month, currency: r.currency, total: r.total }));
+  }
+
+  async getOldestDate(): Promise<string | null> {
+    const db = await getDatabase();
+    const row = await db.getFirstAsync<{ d: string | null }>('SELECT MIN(date) as d FROM expenses');
+    return row?.d ?? null;
   }
 
   async delete(id: string): Promise<void> {
@@ -99,8 +137,8 @@ export class SqliteExpenseRepository implements ExpenseRepository {
       updatedAt: new Date().toISOString(),
     };
     await db.runAsync(
-      `UPDATE expenses SET amount = ?, currency = ?, category = ?, description = ?, date = ?, payment_method = ?, confidence = ?, updated_at = ? WHERE id = ?`,
-      [updated.amount, updated.currency, updated.category, updated.description, updated.date, updated.paymentMethod ?? 'CASH', updated.confidence ?? null, updated.updatedAt, id],
+      `UPDATE expenses SET amount = ?, currency = ?, category = ?, kind = ?, description = ?, date = ?, payment_method = ?, confidence = ?, updated_at = ? WHERE id = ?`,
+      [updated.amount, updated.currency, updated.category, updated.kind ?? 'EXPENSE', updated.description, updated.date, updated.paymentMethod ?? 'CASH', updated.confidence ?? null, updated.updatedAt, id],
     );
     return updated;
   }
@@ -135,16 +173,47 @@ export class InMemoryExpenseRepository implements ExpenseRepository {
     const all = await this.getAll();
     return all.filter((e) => e.date >= from && e.date <= to);
   }
-  async getCategorySummary(fromDate?: string): Promise<{ category: string; currency: string; total: number }[]> {
-    const all = fromDate ? (await this.getAll()).filter((e) => e.date >= fromDate) : await this.getAll();
+  async getByMonthRange(from: string, to: string, kind: EntryKind, limit: number): Promise<Expense[]> {
+    const all = await this.getAll();
+    return all
+      .filter((e) => e.date >= from && e.date <= to && (e.kind ?? 'EXPENSE') === kind)
+      .slice(0, Math.max(limit, 0));
+  }
+  async getCategorySummary(fromDate?: string, kind: EntryKind = 'EXPENSE', toDate?: string): Promise<{ category: string; currency: string; total: number }[]> {
+    const all = await this.getAll();
+    const filtered = all.filter(
+      (e) => (e.kind ?? 'EXPENSE') === kind && (!fromDate || e.date >= fromDate) && (!toDate || e.date <= toDate),
+    );
     const map = new Map<string, { category: string; currency: string; total: number }>();
-    for (const e of all) {
+    for (const e of filtered) {
       const key = `${e.category}|${e.currency}`;
       const prev = map.get(key);
       if (prev) prev.total += e.amount;
       else map.set(key, { category: e.category, currency: e.currency, total: e.amount });
     }
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }
+  async getMonthlyTotals(from: string, to: string): Promise<{ month: string; currency: string; total: number }[]> {
+    const all = await this.getAll();
+    const map = new Map<string, { month: string; currency: string; total: number }>();
+    for (const e of all) {
+      if ((e.kind ?? 'EXPENSE') !== 'EXPENSE' || e.date < from || e.date > to) continue;
+      const month = String(e.date).slice(0, 7);
+      const key = `${month}|${e.currency}`;
+      const prev = map.get(key);
+      if (prev) prev.total += e.amount;
+      else map.set(key, { month, currency: e.currency, total: e.amount });
+    }
+    return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
+  }
+  async getOldestDate(): Promise<string | null> {
+    const all = await this.getAll();
+    let min: string | null = null;
+    for (const e of all) {
+      if (!e?.date) continue;
+      if (min === null || e.date < min) min = e.date;
+    }
+    return min;
   }
   async delete(id: string): Promise<void> {
     this.store.delete(id);

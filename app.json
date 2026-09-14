@@ -25,7 +25,8 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
-      "package": "com.anonymous.expensesia"
+      "package": "com.anonymous.expensesia",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "output": "static",
@@ -49,7 +50,9 @@
         }
       ],
       "expo-asset",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-localization",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,

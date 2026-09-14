@@ -7,6 +7,12 @@ export interface SettingsRepository {
 
 export const SETTING_KEYS = {
   defaultCurrency: 'defaultCurrency',
+  skipIncome: 'skipIncome',
+  language: 'language',
+  themeMode: 'themeMode',
+  budgetAlertsEnabled: 'budgetAlertsEnabled',
+  budgetAlertThreshold: 'budgetAlertThreshold',
+  budgetAlertNotified: 'budgetAlertNotified',
 } as const;
 
 export class SqliteSettingsRepository implements SettingsRepository {

@@ -1,16 +1,18 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
+import { useTranslation } from '@/i18n/useTranslation';
 
 export function OfflineBanner({ onClose }: { onClose?: () => void }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.banner}>
       <View style={styles.icon}>
         <Text>📡</Text>
       </View>
       <View style={styles.texts}>
-        <Text variant="smallBold" style={styles.title}>No internet connection.</Text>
-        <Text variant="small" style={styles.subtitle}>Your saved expenses are still available.</Text>
+        <Text variant="smallBold" style={styles.title}>{t('offline_title')}</Text>
+        <Text variant="small" style={styles.subtitle}>{t('offline_subtitle')}</Text>
       </View>
       {onClose && (
         <Pressable onPress={onClose} style={styles.close}>

@@ -8,6 +8,7 @@ function makeExpense(overrides: Partial<Expense> = {}): Expense {
     amount: 35,
     currency: 'BOB',
     category: ExpenseCategory.FOOD,
+    kind: 'EXPENSE',
     description: 'Lunch',
     date: '2026-09-04',
     paymentMethod: 'CASH',
@@ -57,6 +58,28 @@ describe('InMemoryExpenseRepository', () => {
     await repo.create(e);
     const updated = await repo.update(e.id, { amount: 50 });
     expect(updated?.amount).toBe(50);
+  });
+
+  it('getCategorySummary respeta cota superior toDate', async () => {
+    const repo = new InMemoryExpenseRepository();
+    await repo.create(makeExpense({ id: 'oct', amount: 100, date: '2026-10-05' }));
+    await repo.create(makeExpense({ id: 'nov', amount: 200, date: '2026-11-05' }));
+    const summary = await repo.getCategorySummary('2026-10-01', 'EXPENSE', '2026-10-31');
+    expect(summary.reduce((a, s) => a + s.total, 0)).toBe(100);
+  });
+
+  it('getMonthlyTotals agrupa por mes y getOldestDate da el mínimo', async () => {
+    const repo = new InMemoryExpenseRepository();
+    await repo.create(makeExpense({ id: 'a', amount: 100, date: '2026-08-10' }));
+    await repo.create(makeExpense({ id: 'b', amount: 50, date: '2026-10-05' }));
+    await repo.create(makeExpense({ id: 'c', amount: 25, date: '2026-10-20', kind: 'INCOME' }));
+    const totals = await repo.getMonthlyTotals('2026-01-01', '2026-12-31');
+    // Solo gastos cuentan; ingresos no.
+    expect(totals).toEqual([
+      { month: '2026-08', currency: 'BOB', total: 100 },
+      { month: '2026-10', currency: 'BOB', total: 50 },
+    ]);
+    expect(await repo.getOldestDate()).toBe('2026-08-10');
   });
 
   it('getCategorySummary grupos por categoría y moneda', async () => {

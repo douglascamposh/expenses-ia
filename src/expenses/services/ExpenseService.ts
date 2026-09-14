@@ -1,6 +1,6 @@
-import { ExpenseCategory, isValidCategory } from '../categories/expenseCategories';
-import type { Expense, NewExpense, PaymentMethod } from '../models/Expense';
-import { isValidCurrency, isValidPaymentMethod } from '../models/Expense';
+import { ExpenseCategory, isValidCategory, resolveCategoryId } from '../categories/expenseCategories';
+import type { EntryKind, Expense, NewExpense, PaymentMethod } from '../models/Expense';
+import { isValidCurrency, isValidKind, isValidPaymentMethod } from '../models/Expense';
 import type { ExpenseRepository } from '../repositories/ExpenseRepository';
 
 export type ValidationResult = { valid: boolean; errors: string[] };
@@ -31,6 +31,7 @@ export function validateExpenseCommand(input: unknown): { valid: boolean; errors
   const amount = expenseRaw.amount;
   const currency = expenseRaw.currency as string | undefined;
   const category = expenseRaw.category as string | undefined;
+  const kind = expenseRaw.kind as string | undefined;
   const description = expenseRaw.description as string | undefined;
   const date = expenseRaw.date as string | undefined;
   const paymentMethod = expenseRaw.paymentMethod as string | undefined;
@@ -71,6 +72,13 @@ export function validateExpenseCommand(input: unknown): { valid: boolean; errors
     else normalizedMethod = String(paymentMethod) as PaymentMethod;
   }
 
+  // kind: default EXPENSE (el backend aún no lo envía); si viene inválido, es error.
+  let normalizedKind: EntryKind = 'EXPENSE';
+  if (kind !== undefined && kind !== null && String(kind).trim() !== '') {
+    if (!isValidKind(String(kind))) errors.push('kind debe ser EXPENSE o INCOME');
+    else normalizedKind = String(kind) as EntryKind;
+  }
+
   if (errors.length > 0) return { valid: false, errors };
 
   // Normalizar date a YYYY-MM-DD
@@ -84,7 +92,8 @@ export function validateExpenseCommand(input: unknown): { valid: boolean; errors
   const normalized: NewExpense = {
     amount: amount as number,
     currency: String(currency) as NewExpense['currency'],
-    category: String(category) as ExpenseCategory,
+    category: resolveCategoryId(category) as ExpenseCategory,
+    kind: normalizedKind,
     description: String(description).trim(),
     date: normalizedDate,
     paymentMethod: normalizedMethod,

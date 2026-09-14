@@ -5,14 +5,10 @@ import { Calendar, Check, ChevronLeft, ChevronRight } from 'lucide-react-native'
 import { Button, Text } from '@/components/ui';
 import { Modal } from '@/components/ui/Modal';
 import { Spacing } from '@/constants/theme';
+import { useTranslation } from '@/i18n/useTranslation';
+import { useTheme } from '@/hooks/use-theme';
 
-const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
-
-// Nombres fijos (no dependen del Intl del dispositivo).
-const MONTHS_LONG = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-];
+// Nombres fijos para helpers puros (el componente usa ta() localizado).
 const MONTHS_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
 function toISO(d: Date): string {
@@ -72,6 +68,10 @@ type Props = {
  * mes navegable, accesos Hoy/Ayer y Cancelar/Aceptar.
  */
 export function DatePickerModal({ visible, value, onClose, onSelect }: Props) {
+  const { t, ta } = useTranslation();
+  const theme = useTheme();
+  const weekdays = ta('datePicker_weekdays');
+  const monthsLong = ta('datePicker_monthsLong');
   const [view, setView] = useState(() => {
     const d = parseISO(value);
     return { year: d.getFullYear(), month: d.getMonth() };
@@ -89,8 +89,8 @@ export function DatePickerModal({ visible, value, onClose, onSelect }: Props) {
 
   const cells = useMemo(() => buildMonthCells(view.year, view.month), [view]);
   const monthLabel = useMemo(
-    () => `${MONTHS_LONG[view.month]} ${view.year}`,
-    [view],
+    () => `${monthsLong[view.month] ?? ''} ${view.year}`,
+    [view, monthsLong],
   );
 
   const todayISO = toISO(new Date());
@@ -107,36 +107,36 @@ export function DatePickerModal({ visible, value, onClose, onSelect }: Props) {
     `${view.year}-${String(view.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
   const quickOptions = [
-    { iso: todayISO, label: 'Hoy' },
-    { iso: yesterdayISO, label: 'Ayer' },
+    { iso: todayISO, label: t('datePicker_today') },
+    { iso: yesterdayISO, label: t('datePicker_yesterday') },
   ];
 
   return (
     <Modal visible={visible} variant="center" animation="fade" overlayOpacity={0.45} onDismiss={onClose}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Cerrar calendario" onPress={onClose} style={styles.navBtn}>
-            <ChevronLeft size={22} color="#0F172A" />
+          <Pressable accessibilityRole="button" accessibilityLabel={t('datePicker_a11yClose')} onPress={onClose} style={styles.navBtn}>
+            <ChevronLeft size={22} color={theme.text} />
           </Pressable>
-          <Text variant="smallBold" style={styles.title}>Seleccionar fecha</Text>
+          <Text variant="smallBold" style={styles.title}>{t('datePicker_title')}</Text>
           <View style={styles.navBtn} />
         </View>
 
         <View style={styles.monthRow}>
           <Text variant="smallBold">{monthLabel}</Text>
           <View style={styles.monthNav}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Mes anterior" onPress={() => moveMonth(-1)} style={styles.navBtn}>
-              <ChevronLeft size={18} color="#64748B" />
+            <Pressable accessibilityRole="button" accessibilityLabel={t('datePicker_a11yPrev')} onPress={() => moveMonth(-1)} style={styles.navBtn}>
+              <ChevronLeft size={18} color={theme.textSecondary} />
             </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Mes siguiente" onPress={() => moveMonth(1)} style={styles.navBtn}>
-              <ChevronRight size={18} color="#64748B" />
+            <Pressable accessibilityRole="button" accessibilityLabel={t('datePicker_a11yNext')} onPress={() => moveMonth(1)} style={styles.navBtn}>
+              <ChevronRight size={18} color={theme.textSecondary} />
             </Pressable>
           </View>
         </View>
 
         <View style={styles.weekRow}>
-          {WEEKDAYS.map((w) => (
-            <Text key={w} variant="caption" color="textSecondary" style={styles.weekCell}>{w}</Text>
+          {weekdays.map((w, i) => (
+            <Text key={`${w}-${i}`} variant="caption" color="textSecondary" style={styles.weekCell}>{w}</Text>
           ))}
         </View>
         <View style={styles.grid}>
@@ -148,10 +148,10 @@ export function DatePickerModal({ visible, value, onClose, onSelect }: Props) {
               <Pressable
                 key={iso}
                 accessibilityRole="button"
-                accessibilityLabel={`Elegir ${iso}`}
+                accessibilityLabel={t('datePicker_a11yChoose', { iso })}
                 accessibilityState={{ selected: active }}
                 onPress={() => setPicked(iso)}
-                style={[styles.dayCell, active && styles.dayActive]}
+                style={[styles.dayCell, active && { backgroundColor: theme.primary }]}
               >
                 <Text variant="small" color={active ? undefined : 'textSecondary'} style={active ? styles.dayActiveText : undefined}>
                   {day}
@@ -175,22 +175,22 @@ export function DatePickerModal({ visible, value, onClose, onSelect }: Props) {
                   const d = parseISO(q.iso);
                   setView({ year: d.getFullYear(), month: d.getMonth() });
                 }}
-                style={[styles.quickRow, active && styles.quickActive]}
+                style={[styles.quickRow, { borderColor: active ? theme.primary : theme.border, backgroundColor: active ? theme.primary + '0D' : theme.backgroundElement }]}
               >
-                <Calendar size={16} color={active ? '#2F80FF' : '#64748B'} />
+                <Calendar size={16} color={active ? theme.primary : theme.textSecondary} />
                 <View style={styles.quickText}>
                   <Text variant="smallBold" color={active ? 'primary' : undefined}>{q.label}</Text>
                   <Text variant="caption" color="textSecondary">{formatShortDate(q.iso)}</Text>
                 </View>
-                {active && <Check size={18} color="#2F80FF" />}
+                {active && <Check size={18} color={theme.primary} />}
               </Pressable>
             );
           })}
         </View>
 
         <View style={styles.footer}>
-          <Button variant="ghost" size="md" style={{ flex: 1 }} onPress={onClose}>Cancelar</Button>
-          <Button variant="primary" size="md" style={{ flex: 1 }} onPress={() => onSelect(picked)}>Aceptar</Button>
+          <Button variant="ghost" size="md" style={{ flex: 1 }} onPress={onClose}>{t('datePicker_cancel')}</Button>
+          <Button variant="primary" size="md" style={{ flex: 1 }} onPress={() => onSelect(picked)}>{t('datePicker_accept')}</Button>
         </View>
       </View>
     </Modal>
@@ -208,15 +208,13 @@ const styles = StyleSheet.create({
   weekCell: { flex: 1, textAlign: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', width: '100%' },
   dayCell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 999 },
-  dayActive: { backgroundColor: '#2F80FF' },
   dayActiveText: { color: '#FFFFFF', fontWeight: '700' },
   quickList: { gap: 8, width: '100%' },
   quickRow: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.two,
-    borderWidth: 1, borderColor: '#E6E9F2', borderRadius: 12,
-    paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#FFFFFF',
+    borderWidth: 1, borderRadius: 12,
+    paddingVertical: 10, paddingHorizontal: 12,
   },
-  quickActive: { borderColor: '#2F80FF', backgroundColor: '#2F80FF0D' },
   quickText: { flex: 1, gap: 2 },
   footer: { flexDirection: 'row', gap: Spacing.two, width: '100%' },
 });

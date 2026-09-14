@@ -116,3 +116,16 @@ jest.mock('react-native-reanimated', () => {
     ...actual,
   };
 });
+
+
+jest.mock('expo-notifications', () => ({
+  getPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
+  requestPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
+  scheduleNotificationAsync: jest.fn(() => Promise.resolve('test-id')),
+  setNotificationHandler: jest.fn(),
+}));
+
+jest.mock('expo-localization', () => ({
+  getLocales: jest.fn(() => [{ languageCode: 'es', languageTag: 'es-BO' }]),
+}));
+

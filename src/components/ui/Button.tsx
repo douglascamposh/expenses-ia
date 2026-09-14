@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, type PressableProps, StyleSheet } from 'react-native';
-import { useColorScheme } from 'react-native';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { Colors, Radius } from '@/constants/theme';
 import { Text } from './Text';
@@ -48,13 +48,13 @@ export function Button({
       case 'primary':
         return { bg: colors.primary, border: colors.primary, text: '#FFFFFF' };
       case 'ghost':
-        return { bg: '#FFFFFF', border: colors.primary, text: colors.primary };
+        return { bg: 'transparent', border: colors.primary, text: colors.primary };
       case 'neutral':
-        return { bg: scheme === 'dark' ? colors.backgroundSelected : '#F1F5F9', border: colors.border, text: colors.textSecondary };
+        return { bg: colors.backgroundSelected, border: colors.border, text: colors.textSecondary };
       case 'danger':
         return { bg: colors.danger, border: colors.danger, text: '#FFFFFF' };
       case 'dangerOutline':
-        return { bg: '#FFFFFF', border: '#FECACA', text: colors.danger };
+        return { bg: 'transparent', border: '#FECACA', text: colors.danger };
       default:
         return { bg: colors.primary, border: colors.primary, text: '#FFFFFF' };
     }

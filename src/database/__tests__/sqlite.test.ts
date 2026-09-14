@@ -226,6 +226,105 @@ describe('getDatabase single-flight', () => {
     expect(sqliteMock.deleteDatabaseAsync).not.toHaveBeenCalled();
   });
 
+  it('migración v7 agrega kind en instalaciones v6', async () => {
+    const execCalls: string[] = [];
+    const runCalls: unknown[][] = [];
+    sqliteMock.openDatabaseAsync.mockImplementationOnce(() =>
+      Promise.resolve({
+        execAsync: jest.fn((sql: string) => {
+          execCalls.push(String(sql));
+          return Promise.resolve();
+        }),
+        runAsync: jest.fn((...args: unknown[]) => {
+          runCalls.push(args);
+          return Promise.resolve({});
+        }),
+        getFirstAsync: jest.fn(() => Promise.resolve({ version: 6 })),
+        getAllAsync: jest.fn(() => Promise.resolve([])),
+        closeAsync: jest.fn(() => Promise.resolve()),
+      }),
+    );
+    const db = await getDatabase();
+    expect(db).toBeDefined();
+    expect(execCalls.some((s) => s.includes('ALTER TABLE expenses ADD COLUMN kind'))).toBe(true);
+    expect(execCalls.some((s) => s.includes('ALTER TABLE custom_categories ADD COLUMN kind'))).toBe(true);
+    expect(runCalls.some((a) => String(a[0]).includes('_migrations') && (a[1] as unknown[])[0] === 7)).toBe(true);
+    expect(sqliteMock.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
+
+  it('migración v8 mueve budgets a custom_categories y retira la tabla', async () => {
+    const execCalls: string[] = [];
+    const runCalls: unknown[][] = [];
+    sqliteMock.openDatabaseAsync.mockImplementationOnce(() =>
+      Promise.resolve({
+        execAsync: jest.fn((sql: string) => {
+          execCalls.push(String(sql));
+          return Promise.resolve();
+        }),
+        runAsync: jest.fn((...args: unknown[]) => {
+          runCalls.push(args);
+          return Promise.resolve({});
+        }),
+        getFirstAsync: jest.fn(() => Promise.resolve({ version: 7 })),
+        getAllAsync: jest.fn(() => Promise.resolve([])),
+        closeAsync: jest.fn(() => Promise.resolve()),
+      }),
+    );
+    const db = await getDatabase();
+    expect(db).toBeDefined();
+    expect(execCalls.some((s) => s.includes('ALTER TABLE custom_categories ADD COLUMN budget_amount'))).toBe(true);
+    expect(execCalls.some((s) => s.includes('ALTER TABLE custom_categories ADD COLUMN budget_currency'))).toBe(true);
+    expect(execCalls.some((s) => s.includes('DROP TABLE IF EXISTS budgets'))).toBe(true);
+    expect(runCalls.some((a) => String(a[0]).includes('_migrations') && (a[1] as unknown[])[0] === 8)).toBe(true);
+    expect(sqliteMock.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
+
+  it('instalación fresca registra versiones en orden (sin adelantar DB_VERSION)', async () => {
+    const runCalls: unknown[][] = [];
+    sqliteMock.openDatabaseAsync.mockImplementationOnce(() =>
+      Promise.resolve({
+        execAsync: jest.fn(() => Promise.resolve()),
+        runAsync: jest.fn((...args: unknown[]) => {
+          runCalls.push(args);
+          return Promise.resolve({});
+        }),
+        getFirstAsync: jest.fn(() => Promise.resolve(null)),
+        getAllAsync: jest.fn(() => Promise.resolve([])),
+        closeAsync: jest.fn(() => Promise.resolve()),
+      }),
+    );
+    const db = await getDatabase();
+    expect(db).toBeDefined();
+    const versions = runCalls
+      .filter((a) => String(a[0]).includes('_migrations'))
+      .map((a) => (a[1] as unknown[])[0]);
+    expect(versions).toEqual([2, 3, 4, 5, 6, 7, 8]);
+    expect(sqliteMock.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
+
+  it('reparación: versión 8 marcada pero sin columnas las agrega sin rebuild', async () => {
+    const execCalls: string[] = [];
+    sqliteMock.openDatabaseAsync.mockImplementationOnce(() =>
+      Promise.resolve({
+        execAsync: jest.fn((sql: string) => {
+          execCalls.push(String(sql));
+          return Promise.resolve();
+        }),
+        runAsync: jest.fn(() => Promise.resolve({})),
+        getFirstAsync: jest.fn(() => Promise.resolve({ version: 8 })),
+        // PRAGMA table_info vacío: ninguna columna existe
+        getAllAsync: jest.fn(() => Promise.resolve([])),
+        closeAsync: jest.fn(() => Promise.resolve()),
+      }),
+    );
+    const db = await getDatabase();
+    expect(db).toBeDefined();
+    expect(execCalls.some((s) => s.includes('ADD COLUMN budget_amount'))).toBe(true);
+    expect(execCalls.some((s) => s.includes('ADD COLUMN budget_currency'))).toBe(true);
+    expect(execCalls.some((s) => s.includes("ADD COLUMN kind TEXT NOT NULL DEFAULT 'EXPENSE'"))).toBe(true);
+    expect(sqliteMock.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
+
   it('si hasta el rebuild falla, lanza error claro en español', async () => {
     sqliteMock.openDatabaseAsync.mockImplementation(() =>
       Promise.resolve({

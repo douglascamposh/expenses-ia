@@ -1,5 +1,5 @@
 import { Text as RNText, type TextProps as RNTextProps, type TextStyle } from 'react-native';
-import { useColorScheme } from 'react-native';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { Colors, Fonts } from '@/constants/theme';
 import type { ThemeColor } from '@/constants/theme';
@@ -18,20 +18,20 @@ type Props = RNTextProps & {
 };
 
 const variantMap: Record<TextVariant, TextStyle> = {
-  h1: { fontSize: 28, lineHeight: 32, fontWeight: '800' },
-  title: { fontSize: 28, lineHeight: 32, fontWeight: '800' },
-  h2: { fontSize: 20, lineHeight: 28, fontWeight: '700' },
-  subtitle: { fontSize: 20, lineHeight: 28, fontWeight: '700' },
-  h3: { fontSize: 16, lineHeight: 24, fontWeight: '700' },
-  body: { fontSize: 16, lineHeight: 24, fontWeight: '500' },
-  default: { fontSize: 16, lineHeight: 24, fontWeight: '500' },
-  bodyBold: { fontSize: 16, lineHeight: 24, fontWeight: '700' },
-  small: { fontSize: 14, lineHeight: 20, fontWeight: '500' },
-  smallBold: { fontSize: 14, lineHeight: 20, fontWeight: '700' },
-  caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
-  code: { fontSize: 12, fontWeight: PlatformOSWeight(), fontFamily: Fonts.mono },
-  link: { fontSize: 14, lineHeight: 20, fontWeight: '500' },
-  linkPrimary: { fontSize: 14, lineHeight: 20, fontWeight: '500' },
+  h1:      { fontSize: 34, lineHeight: 40, fontWeight: '800', fontFamily: Fonts.sans, letterSpacing: -0.5 },
+  title:   { fontSize: 28, lineHeight: 34, fontWeight: '700', fontFamily: Fonts.sans, letterSpacing: -0.3 },
+  h2:      { fontSize: 22, lineHeight: 28, fontWeight: '700', fontFamily: Fonts.sans, letterSpacing: -0.2 },
+  subtitle:{ fontSize: 20, lineHeight: 26, fontWeight: '600', fontFamily: Fonts.sans, letterSpacing: -0.2 },
+  h3:      { fontSize: 17, lineHeight: 24, fontWeight: '600', fontFamily: Fonts.sans },
+  body:    { fontSize: 17, lineHeight: 24, fontWeight: '400', fontFamily: Fonts.sans },
+  default: { fontSize: 17, lineHeight: 24, fontWeight: '400', fontFamily: Fonts.sans },
+  bodyBold:{ fontSize: 17, lineHeight: 24, fontWeight: '700', fontFamily: Fonts.sans },
+  small:   { fontSize: 15, lineHeight: 20, fontWeight: '400', fontFamily: Fonts.sans },
+  smallBold:{ fontSize: 15, lineHeight: 20, fontWeight: '700', fontFamily: Fonts.sans },
+  caption: { fontSize: 13, lineHeight: 18, fontWeight: '400', fontFamily: Fonts.sans },
+  code:    { fontSize: 13, fontWeight: PlatformOSWeight(), fontFamily: Fonts.mono },
+  link:    { fontSize: 17, lineHeight: 24, fontWeight: '400', fontFamily: Fonts.sans },
+  linkPrimary: { fontSize: 17, lineHeight: 24, fontWeight: '400', fontFamily: Fonts.sans, color: '#2F80FF' },
 };
 
 function PlatformOSWeight(): TextStyle['fontWeight'] {

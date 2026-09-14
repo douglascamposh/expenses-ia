@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui';
-import { Spacing } from '@/constants/theme';
+import { Spacing, Fonts } from '@/constants/theme';
 import { getCategoryConfig } from '@/expenses/categories/expenseCategories';
 import type { Currency } from '@/expenses/models/Expense';
 import type { BudgetProgress } from '@/expenses/models/Budget';
@@ -56,8 +56,8 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   iconBox: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   emoji: { fontSize: 20 },
-  name: { flex: 1 },
-  barBg: { height: 6, borderRadius: 3, backgroundColor: '#E6E9F2', overflow: 'hidden' },
+  name: { flex: 1, fontFamily: Fonts.sans },
+  barBg: { height: 6, borderRadius: 3, backgroundColor: '#E4E2DE', overflow: 'hidden' },
   barFill: { height: 6, borderRadius: 3 },
   right: { alignItems: 'flex-end', gap: 2 },
 });

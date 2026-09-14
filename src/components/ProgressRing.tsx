@@ -11,7 +11,7 @@ type Props = {
 };
 
 /** Anillo de progreso (0-100 visual; rojo si pct > 1). */
-export function ProgressRing({ pct, size = 88, stroke = 9, color = '#2F80FF', track = '#E6E9F2' }: Props) {
+export function ProgressRing({ pct, size = 88, stroke = 9, color = '#2F80FF', track = '#E4E2DE' }: Props) {
   const normalized = Math.max(0, pct ?? 0);
   const over = normalized > 1;
   const frac = Math.min(normalized, 1);

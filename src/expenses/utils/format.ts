@@ -24,7 +24,7 @@ export function formatCurrency(amount: number, currency: Currency): string {
   return `${symbol} ${formatted}`;
 }
 
-export function formatDateLabel(date: string): string {
+export function formatDateLabel(date: string, lang: 'es' | 'en' = 'es'): string {
   // date: YYYY-MM-DD
   const d = new Date(date + 'T12:00:00');
   const today = new Date();
@@ -32,13 +32,13 @@ export function formatDateLabel(date: string): string {
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
   const yStr = yesterday.toISOString().split('T')[0];
-  if (date === todayStr) return 'Hoy';
-  if (date === yStr) return 'Ayer';
-  return d.toLocaleDateString('es-BO', { day: 'numeric', month: 'short' });
+  if (date === todayStr) return lang === 'en' ? 'Today' : 'Hoy';
+  if (date === yStr) return lang === 'en' ? 'Yesterday' : 'Ayer';
+  return d.toLocaleDateString(lang === 'en' ? 'en-US' : 'es-BO', { day: 'numeric', month: 'short' });
 }
 
-export function formatMonthLabel(date: Date = new Date()): string {
-  return date.toLocaleDateString('es-BO', { month: 'long', year: 'numeric' });
+export function formatMonthLabel(date: Date = new Date(), lang: 'es' | 'en' = 'es'): string {
+  return date.toLocaleDateString(lang === 'en' ? 'en-US' : 'es-BO', { month: 'long', year: 'numeric' });
 }
 
 export function getGreeting(): string {

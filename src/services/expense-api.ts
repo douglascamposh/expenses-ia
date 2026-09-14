@@ -66,10 +66,13 @@ export class AnalyzeError extends Error {
  * Envía audio local a la API y retorna gastos estructurados.
  * @param localAudioUri - filePath/uri del AudioRecordingResult (file://...)
  * @param model - modelo a usar, por defecto 'gemini'
+ * @param categories - categorías del usuario para que la IA haga match
+ *   ([{id,label,kind}]); la IA debe devolver un id existente o el default.
  */
 export async function analyzeAudio(
   localAudioUri: string,
   model: string = 'gemini',
+  categories?: { id: string; label: string; kind: string }[],
 ): Promise<AnalyzeResult> {
   if (!localAudioUri || typeof localAudioUri !== 'string') {
     throw new AnalyzeError('Audio no válido');
@@ -117,6 +120,9 @@ export async function analyzeAudio(
   formData.append('model', model);
   const localDate = new Date().toISOString().split('T')[0];
   formData.append('currentDate', localDate);
+  if (categories && categories.length > 0) {
+    formData.append('categories', JSON.stringify(categories));
+  }
 
   let response: Response;
   try {

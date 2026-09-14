@@ -5,7 +5,7 @@ let db: SQLite.SQLiteDatabase | null = null;
 let dbInit: Promise<SQLite.SQLiteDatabase> | null = null;
 
 const DB_NAME = 'expenses.db';
-const DB_VERSION = 6;
+const DB_VERSION = 8;
 
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (db) return db;
@@ -110,8 +110,10 @@ async function migrate(database: SQLite.SQLiteDatabase) {
       CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
       CREATE INDEX IF NOT EXISTS idx_expenses_created_at ON expenses(created_at);
     `);
-    // OR IGNORE: si dos inicios corren la migración a la vez, el segundo no falla por UNIQUE.
-    await database.runAsync('INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (?, ?)', [DB_VERSION, new Date().toISOString()]);
+    // OJO: no se registra DB_VERSION aquí. Cada bloque registra su versión
+    // al completarse; si un bloque falla a la mitad, la versión no avanza y
+    // la migración se reintenta en el próximo arranque (antes quedaba marcada
+    // como aplicada y las columnas jamás se creaban → "no such column").
   }
 
   if (current < 2) {
@@ -187,7 +189,137 @@ async function migrate(database: SQLite.SQLiteDatabase) {
   }
 
   // Futuras migraciones:
-  // if (current < 7) { ... }
+  if (current < 7) {
+    // kind en gastos (EXPENSE por defecto) y en categorías (GASTO por defecto).
+    // Idempotente como v3: si la columna ya existe se continúa sin error.
+    for (const sql of [
+      `ALTER TABLE expenses ADD COLUMN kind TEXT NOT NULL DEFAULT 'EXPENSE';`,
+      `ALTER TABLE custom_categories ADD COLUMN kind TEXT NOT NULL DEFAULT 'GASTO';`,
+    ]) {
+      try {
+        await database.execAsync(sql);
+      } catch (e) {
+        const msg = String((e as Error)?.message ?? e ?? '').toLowerCase();
+        if (!msg.includes('duplicate column')) throw e;
+        if (__DEV__) console.warn('[sqlite] columna v7 ya existe, se continúa');
+      }
+    }
+    await database.runAsync('INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (?, ?)', [7, new Date().toISOString()]);
+  }
+  // if (current < 8) { ... }
+  if (current < 8) {
+    // El budget vive en la categoría: columnas + materializar customs para
+    // las categorías legado con gastos/presupuestos + retirar tabla budgets.
+    for (const sql of [
+      `ALTER TABLE custom_categories ADD COLUMN budget_amount REAL NOT NULL DEFAULT 0;`,
+      `ALTER TABLE custom_categories ADD COLUMN budget_currency TEXT NOT NULL DEFAULT 'BOB';`,
+    ]) {
+      try {
+        await database.execAsync(sql);
+      } catch (e) {
+        const msg = String((e as Error)?.message ?? e ?? '').toLowerCase();
+        if (!msg.includes('duplicate column')) throw e;
+        if (__DEV__) console.warn('[sqlite] columna v8 ya existe, se continúa');
+      }
+    }
+    const legacyLabel = (id: string) =>
+      `CASE ${id} ` +
+      `WHEN 'FOOD' THEN 'Comida' WHEN 'TRANSPORT' THEN 'Transporte' ` +
+      `WHEN 'GROCERIES' THEN 'Supermercado' WHEN 'SHOPPING' THEN 'Compras' ` +
+      `WHEN 'CLOTHING' THEN 'Ropa' WHEN 'ENTERTAINMENT' THEN 'Entretenimiento' ` +
+      `WHEN 'GAMES' THEN 'Juegos' WHEN 'HEALTH' THEN 'Salud' ` +
+      `WHEN 'BILLS' THEN 'Servicios' WHEN 'HOME' THEN 'Hogar' ` +
+      `WHEN 'EDUCATION' THEN 'Educación' WHEN 'TRAVEL' THEN 'Viajes' ` +
+      `ELSE ${id} END`;
+    const legacyEmoji = (id: string) =>
+      `CASE ${id} ` +
+      `WHEN 'FOOD' THEN '🍔' WHEN 'TRANSPORT' THEN '🚗' ` +
+      `WHEN 'GROCERIES' THEN '🛒' WHEN 'SHOPPING' THEN '🛍' ` +
+      `WHEN 'CLOTHING' THEN '👕' WHEN 'ENTERTAINMENT' THEN '🎬' ` +
+      `WHEN 'GAMES' THEN '🎮' WHEN 'HEALTH' THEN '❤️' ` +
+      `WHEN 'BILLS' THEN '🧾' WHEN 'HOME' THEN '🏠' ` +
+      `WHEN 'EDUCATION' THEN '📚' WHEN 'TRAVEL' THEN '✈️' ` +
+      `ELSE '📦' END`;
+    const legacyColor = (id: string) =>
+      `CASE ${id} ` +
+      `WHEN 'FOOD' THEN '#f97316' WHEN 'TRANSPORT' THEN '#3b82f6' ` +
+      `WHEN 'GROCERIES' THEN '#10b981' WHEN 'SHOPPING' THEN '#ec4899' ` +
+      `WHEN 'CLOTHING' THEN '#8b5cf6' WHEN 'ENTERTAINMENT' THEN '#f59e0b' ` +
+      `WHEN 'GAMES' THEN '#06b6d4' WHEN 'HEALTH' THEN '#ef4444' ` +
+      `WHEN 'BILLS' THEN '#64748b' WHEN 'HOME' THEN '#84cc16' ` +
+      `WHEN 'EDUCATION' THEN '#6366f1' WHEN 'TRAVEL' THEN '#0ea5e9' ` +
+      `ELSE '#a1a1aa' END`;
+    // 1) Customs para categorías con gastos (budget 0 por ahora).
+    await database.execAsync(`
+      INSERT OR IGNORE INTO custom_categories (id, label, emoji, color, kind, budget_amount, budget_currency, created_at)
+      SELECT DISTINCT e.category,
+        ${legacyLabel('e.category')},
+        ${legacyEmoji('e.category')},
+        ${legacyColor('e.category')},
+        'GASTO', 0, 'BOB', datetime('now')
+      FROM expenses e
+      WHERE e.category <> 'OTHER'
+        AND e.category NOT IN (SELECT id FROM custom_categories);
+    `);
+    // 2) Customs solo con presupuesto (con su monto).
+    await database.execAsync(`
+      INSERT OR IGNORE INTO custom_categories (id, label, emoji, color, kind, budget_amount, budget_currency, created_at)
+      SELECT DISTINCT b.category,
+        ${legacyLabel('b.category')},
+        ${legacyEmoji('b.category')},
+        ${legacyColor('b.category')},
+        'GASTO', b.amount, b.currency, datetime('now')
+      FROM budgets b
+      WHERE b.category <> 'OTHER'
+        AND b.category NOT IN (SELECT id FROM custom_categories);
+    `);
+    // 3) Montos de budgets sobre customs existentes.
+    await database.execAsync(`
+      UPDATE custom_categories SET
+        budget_amount = COALESCE((SELECT amount FROM budgets WHERE budgets.category = custom_categories.id), budget_amount),
+        budget_currency = COALESCE((SELECT currency FROM budgets WHERE budgets.category = custom_categories.id), budget_currency)
+      WHERE EXISTS (SELECT 1 FROM budgets WHERE budgets.category = custom_categories.id);
+    `);
+    // 4) Una sola fuente: retirar tabla budgets.
+    await database.execAsync('DROP TABLE IF EXISTS budgets;');
+    await database.runAsync('INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (?, ?)', [8, new Date().toISOString()]);
+  }
+
+  // Reparación defensiva (corre siempre): si una migración vieja quedó marcada
+  // como aplicada sin crear sus columnas (p. ej. v8 interrumpida → la app
+  // fallaba con "no such column budget_amount"), se agregan aquí.
+  await ensureColumn(database, 'expenses', 'kind', `kind TEXT NOT NULL DEFAULT 'EXPENSE'`);
+  await ensureColumn(database, 'custom_categories', 'kind', `kind TEXT NOT NULL DEFAULT 'GASTO'`);
+  await ensureColumn(database, 'custom_categories', 'budget_amount', `budget_amount REAL NOT NULL DEFAULT 0`);
+  await ensureColumn(database, 'custom_categories', 'budget_currency', `budget_currency TEXT NOT NULL DEFAULT 'BOB'`);
+}
+
+/**
+ * Agrega la columna si falta (idempotente). No falla si ya existe o si la
+ * tabla aún no existe (la crean los bloques de migración).
+ */
+async function ensureColumn(
+  database: SQLite.SQLiteDatabase,
+  table: string,
+  column: string,
+  ddl: string,
+): Promise<void> {
+  try {
+    const rows = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(${table});`);
+    if ((rows ?? []).some((r) => r?.name === column)) return;
+  } catch {
+    // Si no se puede inspeccionar, se intenta el ALTER y se tolera duplicado.
+  }
+  try {
+    await database.execAsync(`ALTER TABLE ${table} ADD COLUMN ${ddl};`);
+  } catch (e) {
+    const msg = String((e as Error)?.message ?? e ?? '').toLowerCase();
+    if (msg.includes('duplicate column') || msg.includes('no such table')) {
+      if (__DEV__ && msg.includes('no such table')) console.warn(`[sqlite] tabla ${table} ausente al reparar ${column}`);
+      return;
+    }
+    throw e;
+  }
 }
 
 async function getCurrentVersion(database: SQLite.SQLiteDatabase): Promise<number> {

@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import {
-  EXPENSE_CATEGORIES,
+  SYSTEM_CATEGORY,
+  isUserCategory,
   setCustomCategories,
   type CategoryConfig,
 } from '@/expenses/categories/expenseCategories';
@@ -50,10 +51,30 @@ export const createCategory = createAsyncThunk(
   },
 );
 
+export const updateCategory = createAsyncThunk(
+  'categories/update',
+  async ({ id, input }: { id: string; input: CustomCategoryInput }, { rejectWithValue }) => {
+    if (!isUserCategory(id)) {
+      return rejectWithValue('Las categorías del sistema no se pueden editar');
+    }
+    try {
+      await categoryRepository.update(id, input);
+      const list = await categoryRepository.getCustom().catch(() => [] as CategoryConfig[]);
+      syncRegistry(list);
+      return list;
+    } catch (e) {
+      return rejectWithValue((e as Error).message ?? 'No se pudo actualizar la categoría');
+    }
+  },
+);
+
 export const deleteCategory = createAsyncThunk(
   'categories/delete',
   async (id: string, { rejectWithValue }) => {
-    if ((EXPENSE_CATEGORIES as CategoryConfig[]).some((c) => String(c.id) === String(id))) {
+    if (String(id) === String(SYSTEM_CATEGORY.id)) {
+      return rejectWithValue('La categoría del sistema no se puede eliminar');
+    }
+    if (!isUserCategory(id)) {
       return rejectWithValue('Las categorías del sistema no se pueden eliminar');
     }
     try {
@@ -95,6 +116,13 @@ const categoriesSlice = createSlice({
       })
       .addCase(createCategory.rejected, (state, action) => {
         state.error = (action.payload as string) ?? action.error.message ?? 'No se pudo crear';
+      })
+      .addCase(updateCategory.fulfilled, (state, action) => {
+        state.custom = [...(action.payload ?? [])];
+        state.error = null;
+      })
+      .addCase(updateCategory.rejected, (state, action) => {
+        state.error = (action.payload as string) ?? action.error.message ?? 'No se pudo actualizar';
       })
       .addCase(deleteCategory.fulfilled, (state, action) => {
         state.custom = [...(action.payload ?? [])];

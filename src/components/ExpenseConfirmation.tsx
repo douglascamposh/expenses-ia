@@ -9,6 +9,8 @@ import { Spacing } from '@/constants/theme';
 import { getCategoryConfig } from '@/expenses/categories/expenseCategories';
 import { SUPPORTED_CURRENCIES, type NewExpense } from '@/expenses/models/Expense';
 import { formatCurrency } from '@/expenses/utils/format';
+import { useTranslation } from '@/i18n/useTranslation';
+import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
   visible: boolean;
@@ -19,6 +21,8 @@ type Props = {
 };
 
 export function ExpenseConfirmation({ visible, expense, onSave, onCancel, subtitle }: Props) {
+  const { t } = useTranslation();
+  const theme = useTheme();
   const [draft, setDraft] = useState<NewExpense>(expense);
   const [editing, setEditing] = useState(false);
   const cat = getCategoryConfig(draft.category);
@@ -33,12 +37,12 @@ export function ExpenseConfirmation({ visible, expense, onSave, onCancel, subtit
   return (
     <Modal visible={visible} variant="center" animation="slide" onDismiss={onCancel}>
       <View style={styles.content}>
-        <View style={styles.checkCircle}>
+        <View style={[styles.checkCircle, { backgroundColor: theme.primary }]}>
           <Check size={18} color="#fff" strokeWidth={3} />
         </View>
-        <Text variant="smallBold" align="center">New expense{subtitle ? ` · ${subtitle}` : ''}</Text>
+        <Text variant="smallBold" align="center">{t('expenseConfirmation_title')}{subtitle ? ` · ${subtitle}` : ''}</Text>
 
-        <View style={styles.expenseCardInner}>
+        <View style={[styles.expenseCardInner, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
           <View style={[styles.iconBox, { backgroundColor: cat.color + '1A', borderColor: cat.color + '33', borderWidth: 1 }]}>
             <Text style={styles.emoji}>{cat.emoji}</Text>
           </View>
@@ -47,36 +51,36 @@ export function ExpenseConfirmation({ visible, expense, onSave, onCancel, subtit
           <Text variant="small" color="textSecondary" align="center">{cat.label} · {draft.date}</Text>
         </View>
 
-        <View style={styles.confidenceBox}>
+        <View style={[styles.confidenceBox, { backgroundColor: theme.backgroundSelected, borderColor: theme.border }]}>
           <View style={styles.confidenceHeader}>
-            <Text variant="small" color="textSecondary">Confidence</Text>
+            <Text variant="small" color="textSecondary">{t('expenseConfirmation_confidence')}</Text>
             <Text variant="smallBold">{confidencePct}%</Text>
           </View>
-          <View style={styles.confidenceTrack}>
-            <View style={[styles.confidenceFill, { width: `${confidencePct}%` as unknown as number }]} />
+          <View style={[styles.confidenceTrack, { backgroundColor: theme.border }]}>
+            <View style={[styles.confidenceFill, { width: `${confidencePct}%` as unknown as number, backgroundColor: theme.success }]} />
           </View>
         </View>
 
         {editing && (
           <View style={styles.editBox}>
-            <Text variant="smallBold">Editar</Text>
-            <Input value={String(draft.amount)} onChangeText={(t) => setDraft({ ...draft, amount: parseFloat(t) || 0 })} keyboardType="numeric" placeholder="Amount" />
-            <Input value={draft.description} onChangeText={(t) => setDraft({ ...draft, description: t })} placeholder="Description" />
+            <Text variant="smallBold">{t('expenseConfirmation_edit')}</Text>
+            <Input value={String(draft.amount)} onChangeText={(txt) => setDraft({ ...draft, amount: parseFloat(txt) || 0 })} keyboardType="numeric" placeholder={t('expenseConfirmation_amountPh')} />
+            <Input value={draft.description} onChangeText={(txt) => setDraft({ ...draft, description: txt })} placeholder={t('expenseConfirmation_descPh')} />
             <CategoryPicker selected={draft.category} onSelect={(id) => setDraft({ ...draft, category: id as NewExpense['category'] })} />
             <View style={[styles.row, styles.currencyGrid]}>
               {SUPPORTED_CURRENCIES.map((cur) => (
                 <Chip key={cur} label={cur} selected={draft.currency === cur} onPress={() => setDraft({ ...draft, currency: cur })} size="sm" />
               ))}
             </View>
-            <Input value={draft.date} onChangeText={(t) => setDraft({ ...draft, date: t })} placeholder="YYYY-MM-DD" />
+            <Input value={draft.date} onChangeText={(txt) => setDraft({ ...draft, date: txt })} placeholder={t('expenseConfirmation_datePh')} />
           </View>
         )}
 
         <View style={styles.actions}>
-          <Button variant="ghost" size="md" onPress={() => setEditing((v) => !v)}>{editing ? 'Done' : 'Edit'}</Button>
-          <Button variant="primary" size="md" onPress={() => onSave(draft)}>Save</Button>
+          <Button variant="ghost" size="md" onPress={() => setEditing((v) => !v)}>{editing ? t('expenseConfirmation_done') : t('expenseConfirmation_editBtn')}</Button>
+          <Button variant="primary" size="md" onPress={() => onSave(draft)}>{t('expenseConfirmation_save')}</Button>
         </View>
-        <Button variant="neutral" size="sm" onPress={onCancel} style={{ borderWidth: 0, backgroundColor: 'transparent' }}>Cancel</Button>
+        <Button variant="neutral" size="sm" onPress={onCancel} style={{ borderWidth: 0, backgroundColor: 'transparent' }}>{t('expenseConfirmation_cancel')}</Button>
       </View>
     </Modal>
   );
@@ -84,14 +88,14 @@ export function ExpenseConfirmation({ visible, expense, onSave, onCancel, subtit
 
 const styles = StyleSheet.create({
   content: { alignItems: 'center', gap: Spacing.two, width: '100%' },
-  checkCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#2F80FF', alignItems: 'center', justifyContent: 'center' },
-  expenseCardInner: { width: '100%', borderRadius: 16, padding: Spacing.three, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#E6E9F2', backgroundColor: '#FFFFFF', marginTop: Spacing.two },
+  checkCircle: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  expenseCardInner: { width: '100%', borderRadius: 16, padding: Spacing.three, alignItems: 'center', gap: 6, borderWidth: 1, marginTop: Spacing.two },
   iconBox: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   emoji: { fontSize: 28 },
-  confidenceBox: { width: '100%', borderRadius: 12, padding: Spacing.three, backgroundColor: '#F8FAFF', borderWidth: 1, borderColor: '#E6E9F2', gap: 8, marginTop: Spacing.one },
+  confidenceBox: { width: '100%', borderRadius: 12, padding: Spacing.three, borderWidth: 1, gap: 8, marginTop: Spacing.one },
   confidenceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  confidenceTrack: { height: 6, borderRadius: 3, backgroundColor: '#E6E9F2', overflow: 'hidden' },
-  confidenceFill: { height: 6, borderRadius: 3, backgroundColor: '#0EB07B' },
+  confidenceTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
+  confidenceFill: { height: 6, borderRadius: 3 },
   editBox: { width: '100%', gap: Spacing.two, marginTop: Spacing.two },
   row: { flexDirection: 'row', gap: 8 },
   currencyGrid: { flexWrap: 'wrap' },

@@ -40,12 +40,10 @@ describe('InMemoryBudgetRepository', () => {
   });
 });
 
-describe('SqliteBudgetRepository (mock expo-sqlite)', () => {
-  it('upsert válido persiste y getAll vacío devuelve []', async () => {
+describe('SqliteBudgetRepository (mock expo-sqlite, fachada sobre categorías)', () => {
+  it('upsert rechaza si la categoría no existe como custom', async () => {
     const repo = new SqliteBudgetRepository();
-    const saved = await repo.upsert({ category: ExpenseCategory.FOOD, amount: 500, currency: 'BOB' });
-    expect(saved).toMatchObject({ category: ExpenseCategory.FOOD, amount: 500 });
-    expect(await repo.getAll()).toEqual([]);
+    await expect(repo.upsert({ category: ExpenseCategory.FOOD, amount: 500, currency: 'BOB' })).rejects.toThrow(/inválida/);
   });
 
   it('upsert inválido lanza sin tocar SQLite', async () => {

@@ -4,6 +4,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import BudgetsScreen from '../budgets';
 import expensesReducer from '@/store/expensesSlice';
 import settingsReducer from '@/store/settingsSlice';
+import categoriesReducer from '@/store/categoriesSlice';
 import { formatMonthLabel } from '@/expenses/utils/format';
 
 jest.mock('@/expenses/repositories/ExpenseRepository', () => ({
@@ -12,7 +13,10 @@ jest.mock('@/expenses/repositories/ExpenseRepository', () => ({
     update: jest.fn(() => Promise.resolve(null)),
     getAll: jest.fn(() => Promise.resolve([])),
     getRecent: jest.fn(() => Promise.resolve([])),
+    getByMonthRange: jest.fn(() => Promise.resolve([])),
     getCategorySummary: jest.fn(() => Promise.resolve([])),
+    getMonthlyTotals: jest.fn(() => Promise.resolve([])),
+    getOldestDate: jest.fn(() => Promise.resolve(null)),
     create: jest.fn((e) => Promise.resolve(e)),
   },
 }));
@@ -23,17 +27,31 @@ jest.mock('@/expenses/repositories/BudgetRepository', () => ({
     getAll: jest.fn(() => Promise.resolve([])),
     getProgress: jest.fn(() =>
       Promise.resolve([
-        { category: 'FOOD', currency: 'BOB', limit: 200, spent: 120, pct: 0.6, over: false },
-        { category: 'TRANSPORT', currency: 'BOB', limit: 150, spent: 60, pct: 0.4, over: false },
+        { category: 'COMIDA', currency: 'BOB', limit: 200, spent: 120, pct: 0.6, over: false },
       ]),
     ),
     delete: jest.fn(() => Promise.resolve()),
   },
 }));
 
+jest.mock('@/expenses/repositories/CategoryRepository', () => ({
+  categoryRepository: {
+    getCustom: jest.fn(() =>
+      Promise.resolve([
+        { id: 'COMIDA', label: 'Comida', icon: 'food', emoji: '🍔', color: '#ef4444', kind: 'GASTO' },
+        { id: 'TRANSPORTE', label: 'Transporte', icon: 'car', emoji: '🚕', color: '#eab308', kind: 'GASTO' },
+      ]),
+    ),
+    create: jest.fn((c) => Promise.resolve(c)),
+    update: jest.fn((id, c) => Promise.resolve({ id, ...c })),
+    delete: jest.fn(() => Promise.resolve()),
+    clearAll: jest.fn(() => Promise.resolve()),
+  },
+}));
+
 function renderWithStore() {
   const testStore = configureStore({
-    reducer: { expenses: expensesReducer, settings: settingsReducer },
+    reducer: { expenses: expensesReducer, settings: settingsReducer, categories: categoriesReducer },
     middleware: (g) => g({ serializableCheck: false }),
   });
   return render(
@@ -43,36 +61,96 @@ function renderWithStore() {
   );
 }
 
-describe('BudgetsScreen', () => {
-  it('muestra total agregado y lista de categorías', async () => {
-    const { getByText } = renderWithStore();
+describe('BudgetsScreen (lista de categorías)', () => {
+  it('muestra total y secciones con/sin presupuesto', async () => {
+    const { getByText, getAllByText } = renderWithStore();
     await waitFor(() => expect(getByText('Total de presupuestos')).toBeTruthy());
     expect(getByText(/60%/)).toBeTruthy();
-    expect(getByText(/40%/)).toBeTruthy();
-    expect(getByText('Food')).toBeTruthy();
+    expect(getByText('Con presupuesto')).toBeTruthy();
+    expect(getByText('Sin presupuesto')).toBeTruthy();
+    expect(getByText('Comida')).toBeTruthy();
+    expect(getByText('BOB 200')).toBeTruthy();
+    expect(getByText('Transporte')).toBeTruthy();
+    // Transporte + Otros (sistema) sin presupuesto
+    expect(getAllByText('Sin presupuesto establecido')).toHaveLength(2);
   });
 
-  it('botón abre el modal de agregar presupuesto', async () => {
-    const { getByText } = renderWithStore();
-    await waitFor(() => expect(getByText('+ Agregar presupuesto')).toBeTruthy());
-    fireEvent.press(getByText('+ Agregar presupuesto'));
-    await waitFor(() => expect(getByText('Editar presupuesto')).toBeTruthy());
-  });
-
-  it('píldora de período y filas estilo mockup', async () => {
+  it('píldora con el mes visible', async () => {
     const { getByText } = renderWithStore();
     await waitFor(() => expect(getByText('Total de presupuestos')).toBeTruthy());
-    // Píldora con el mes en curso (etiqueta del período actual)
     expect(getByText(formatMonthLabel(new Date()))).toBeTruthy();
-    // Fila compacta: símbolo + gastado/límite
-    expect(getByText('Bs 120 / 200')).toBeTruthy();
-    expect(getByText('Bs 60 / 150')).toBeTruthy();
   });
 
-  it('botón circular + abre el modal', async () => {
-    const { getByText, getByLabelText } = renderWithStore();
-    await waitFor(() => expect(getByText('Total de presupuestos')).toBeTruthy());
-    fireEvent.press(getByLabelText('Agregar presupuesto'));
-    await waitFor(() => expect(getByText('Editar presupuesto')).toBeTruthy());
+  it('tap en fila sin presupuesto crea el monto inline', async () => {
+    const { budgetRepository } = jest.requireMock('@/expenses/repositories/BudgetRepository') as {
+      budgetRepository: { upsert: jest.Mock };
+    };
+    budgetRepository.upsert.mockClear();
+    const { getByLabelText, getByTestId, getByText } = renderWithStore();
+    await waitFor(() => expect(getByText('Transporte')).toBeTruthy());
+    fireEvent.press(getByLabelText('Presupuesto Transporte'));
+    const input = getByTestId('budget-amount-TRANSPORTE');
+    fireEvent.changeText(input, '350');
+    fireEvent.press(getByLabelText('Guardar presupuesto'));
+    await waitFor(() => expect(budgetRepository.upsert).toHaveBeenCalled());
+    expect(budgetRepository.upsert.mock.calls[0][0]).toMatchObject({
+      category: 'TRANSPORTE',
+      amount: 350,
+      currency: 'BOB',
+    });
+  });
+
+  it('tap en fila con presupuesto edita el monto inline', async () => {
+    const { budgetRepository } = jest.requireMock('@/expenses/repositories/BudgetRepository') as {
+      budgetRepository: { upsert: jest.Mock };
+    };
+    budgetRepository.upsert.mockClear();
+    const { getByLabelText, getByTestId, getByText } = renderWithStore();
+    await waitFor(() => expect(getByText('Comida')).toBeTruthy());
+    fireEvent.press(getByLabelText('Presupuesto Comida'));
+    expect(getByTestId('budget-amount-COMIDA').props.value).toBe('200');
+    fireEvent.changeText(getByTestId('budget-amount-COMIDA'), '250');
+    fireEvent.press(getByLabelText('Guardar presupuesto'));
+    await waitFor(() => expect(budgetRepository.upsert).toHaveBeenCalled());
+    expect(budgetRepository.upsert.mock.calls[0][0]).toMatchObject({
+      category: 'COMIDA',
+      amount: 250,
+      currency: 'BOB',
+    });
+  });
+
+  it('monto inválido no guarda y muestra error', async () => {
+    const { budgetRepository } = jest.requireMock('@/expenses/repositories/BudgetRepository') as {
+      budgetRepository: { upsert: jest.Mock };
+    };
+    budgetRepository.upsert.mockClear();
+    const { getByLabelText, getByTestId, getByText } = renderWithStore();
+    await waitFor(() => expect(getByText('Comida')).toBeTruthy());
+    fireEvent.press(getByLabelText('Presupuesto Comida'));
+    fireEvent.changeText(getByTestId('budget-amount-COMIDA'), '0');
+    fireEvent.press(getByLabelText('Guardar presupuesto'));
+    await waitFor(() => expect(getByText(/mayor a 0/)).toBeTruthy());
+    expect(budgetRepository.upsert).not.toHaveBeenCalled();
+  });
+
+  it('swipe en fila con presupuesto borra directo', async () => {
+    const { budgetRepository } = jest.requireMock('@/expenses/repositories/BudgetRepository') as {
+      budgetRepository: { delete: jest.Mock };
+    };
+    budgetRepository.delete.mockClear();
+    const { getByLabelText, getByText } = renderWithStore();
+    await waitFor(() => expect(getByText('Comida')).toBeTruthy());
+    fireEvent.press(getByLabelText('Eliminar presupuesto Comida'));
+    await waitFor(() => expect(budgetRepository.delete).toHaveBeenCalledWith('COMIDA'));
+  });
+
+  it('tarjeta de alertas: toggle activa y muestra el umbral', async () => {
+    const { getByText, getByTestId } = renderWithStore();
+    await waitFor(() => expect(getByText('Alertas de presupuesto')).toBeTruthy());
+    expect(getByText('Umbral de alerta')).toBeTruthy();
+    expect(getByText('80%')).toBeTruthy();
+    expect(getByTestId('budget-alerts-slider')).toBeTruthy();
+    fireEvent(getByTestId('budget-alerts-toggle'), 'onValueChange', true);
+    await waitFor(() => expect(getByTestId('budget-alerts-toggle').props.value).toBe(true));
   });
 });

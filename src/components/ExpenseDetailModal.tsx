@@ -1,81 +1,107 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState } from 'react';
-import { Pressable, View, StyleSheet } from 'react-native';
-import { Calendar, ChevronLeft, MoreHorizontal } from 'lucide-react-native';
-import { Text, Button } from '@/components/ui';
+import { Dimensions, Pressable, StyleSheet, View } from 'react-native';
+import { X } from 'lucide-react-native';
 import { Modal } from '@/components/ui/Modal';
-import { DeleteConfirm } from '@/components/DeleteConfirm';
-import { EditExpenseModal } from '@/components/EditExpenseModal';
+import { QuickExpenseForm } from '@/components/QuickExpenseForm';
 import { Spacing } from '@/constants/theme';
-import { getCategoryConfig } from '@/expenses/categories/expenseCategories';
-import type { Expense } from '@/expenses/models/Expense';
-import { formatCurrency } from '@/expenses/utils/format';
+import type { Expense, NewExpense } from '@/expenses/models/Expense';
+import { useTranslation } from '@/i18n/useTranslation';
 
-export function ExpenseDetailModal({ expense, visible, onClose, onDelete, onEdit, saving }: { expense: Expense | null | undefined; visible: boolean; onClose: () => void; onDelete: (id: string) => void; onEdit: (patch: Partial<Expense>) => void; saving: boolean }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<Expense | null>(expense ?? null);
-  const [showDelete, setShowDelete] = useState(false);
+type Props = {
+  expense: Expense | null | undefined;
+  visible: boolean;
+  saving?: boolean;
+  onClose: () => void;
+  /** Guarda el borrador editado (la pantalla despacha updateExpense). */
+  onSave: (patch: Partial<Expense>) => void;
+};
+
+/** Separa un #tag final de la descripción para editarlo aparte. */
+function splitTag(description: string): { desc: string; tag: string } {
+  const m = String(description ?? '').match(/^(.*)\s+#(\S+)\s*$/);
+  if (!m) return { desc: String(description ?? ''), tag: '' };
+  return { desc: m[1], tag: m[2] };
+}
+
+/**
+ * Detalle editable con la misma interfaz que agregar (QuickExpenseForm).
+ * Sheet alto estilo mockup (fondo blanco hasta abajo), sin tag visible
+ * (se conserva al guardar) y sin modales anidados.
+ */
+export function ExpenseDetailModal({ expense, visible, saving, onClose, onSave }: Props) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState<NewExpense | null>(null);
+  const [initialTag, setInitialTag] = useState('');
 
   useEffect(() => {
-    if (expense) setDraft(expense);
-    setEditing(false);
-  }, [expense]);
+    if (visible && expense) {
+      const { desc, tag } = splitTag(expense.description);
+      setDraft({
+        amount: expense.amount,
+        currency: expense.currency,
+        category: expense.category,
+        kind: expense.kind ?? 'EXPENSE',
+        description: desc,
+        date: expense.date,
+        paymentMethod: expense.paymentMethod ?? 'CASH',
+        confidence: expense.confidence,
+      });
+      setInitialTag(tag);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, expense?.id]);
 
-  if (!expense || !draft) return null;
-  const cat = getCategoryConfig(draft.category);
+  if (!expense) return null;
+
+  const handleSave = (d: NewExpense) => {
+    onSave({
+      amount: d.amount,
+      description: d.description,
+      category: d.category,
+      kind: d.kind,
+      currency: d.currency,
+      date: d.date,
+      paymentMethod: d.paymentMethod ?? 'CASH',
+    });
+  };
 
   return (
-    <>
-      <Modal visible={visible} variant="center" animation="fade" onDismiss={onClose}>
-        <View style={styles.headerBar}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Volver" onPress={onClose} style={styles.backBtn}>
-            <ChevronLeft size={22} color="#0F172A" />
-          </Pressable>
-          <View style={styles.headerIcon}>
-            <MoreHorizontal size={20} color="#64748B" />
-          </View>
-        </View>
-
-        <View style={[styles.iconWrap, { backgroundColor: cat.color + '1A', borderColor: cat.color + '33' }]}>
-          <Text style={styles.emoji}>{cat.emoji}</Text>
-        </View>
-        <Text variant="smallBold" align="center">{expense.description}</Text>
-        <Text variant="h1" align="center">{formatCurrency(expense.amount, expense.currency)}</Text>
-        <View style={styles.badgeRow}>
-          <View style={styles.badge}>
-            <Text variant="small" color="textSecondary">◉ {cat.label}</Text>
-          </View>
-        </View>
-        <View style={styles.dateRow}>
-          <Calendar size={16} color="#64748B" />
-          <Text variant="small" color="textSecondary">{new Date(expense.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</Text>
-        </View>
-
-        <View style={styles.actions}>
-          <Button variant="ghost" size="md" style={{ flex: 1 }} onPress={() => setEditing(true)}>Edit</Button>
-          <Button variant="dangerOutline" size="md" style={{ flex: 1 }} onPress={() => setShowDelete(true)}>Delete</Button>
-        </View>
-      </Modal>
-      <EditExpenseModal
-        visible={editing}
-        expense={draft}
-        saving={saving}
-        onClose={() => setEditing(false)}
-        onSave={(patch) => { setEditing(false); onEdit(patch); }}
-      />
-      <DeleteConfirm visible={showDelete} onCancel={() => setShowDelete(false)} onDelete={() => { setShowDelete(false); onDelete(expense.id); }} />
-    </>
+    <Modal visible={visible} variant="bottomSheet" animation="slide" overlayOpacity={0.45} onDismiss={onClose}>
+      <View style={styles.container}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('common_close')}
+          onPress={onClose}
+          style={styles.closeBtn}
+        >
+          <X size={22} color="#0F172A" />
+        </Pressable>
+        {draft && (
+          <QuickExpenseForm
+            key={expense.id}
+            value={draft}
+            onChange={(patch) => setDraft((prev) => (prev ? { ...prev, ...patch } : prev))}
+            defaultCurrency={expense.currency}
+            onSave={handleSave}
+            initialTag={initialTag}
+            expandBottom
+            allowCategory={expense.category}
+          />
+        )}
+      </View>
+    </Modal>
   );
 }
 
+/** Sheet alto estilo mockup: el blanco llega hasta abajo con la fila de pago. */
+const SHEET_MIN_H = Math.round(Dimensions.get('window').height * 0.8);
+
 const styles = StyleSheet.create({
-  headerBar: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center' },
-  backBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  headerIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  iconWrap: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  emoji: { fontSize: 36 },
-  badgeRow: { flexDirection: 'row', gap: 8 },
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: '#EEF2FF', borderWidth: 1, borderColor: '#E6E9F2' },
-  dateRow: { flexDirection: 'row', gap: 6, alignItems: 'center', marginTop: 4 },
-  actions: { flexDirection: 'row', gap: Spacing.three, width: '100%', marginTop: Spacing.two },
+  container: { width: '100%', minHeight: SHEET_MIN_H, gap: Spacing.two },
+  closeBtn: {
+    width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#FFFFFF', alignSelf: 'flex-end',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+  },
 });

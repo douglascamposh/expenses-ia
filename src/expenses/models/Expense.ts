@@ -13,6 +13,13 @@ export type PaymentMethod = 'CASH' | 'CARD';
 
 export type AppLang = 'es' | 'en';
 
+/** Gasto o ingreso. Los ingresos no suman a presupuestos ni totales de gasto. */
+export type EntryKind = 'EXPENSE' | 'INCOME';
+
+export function isValidKind(k: unknown): k is EntryKind {
+  return k === 'EXPENSE' || k === 'INCOME';
+}
+
 const PAYMENT_LABELS: Record<PaymentMethod, Record<AppLang, string>> = {
   CASH: { es: 'Efectivo', en: 'Cash' },
   CARD: { es: 'Tarjeta', en: 'Card' },
@@ -40,6 +47,7 @@ export interface Expense {
   amount: number;
   currency: Currency;
   category: ExpenseCategory;
+  kind: EntryKind;
   description: string;
   date: string; // YYYY-MM-DD ISO date
   paymentMethod: PaymentMethod;

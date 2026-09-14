@@ -1,36 +1,53 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Plus } from 'lucide-react-native';
+import type { Swipeable } from 'react-native-gesture-handler';
 import { ThemedView } from '@/components/themed-view';
+import { CategoryRow } from '@/components/CategoryRow';
 import { DeleteConfirm } from '@/components/DeleteConfirm';
-import { Button, Input, Text } from '@/components/ui';
-import { Modal } from '@/components/ui/Modal';
-import { Spacing } from '@/constants/theme';
-import { EXPENSE_CATEGORIES } from '@/expenses/categories/expenseCategories';
+import { Button, Text } from '@/components/ui';
+import { CreateCategoryModal } from '@/components/CreateCategoryModal';
+import { Spacing, Fonts } from '@/constants/theme';
+import {
+  SYSTEM_CATEGORY,
+  getSuggestions,
+  type CategoryKind,
+} from '@/expenses/categories/expenseCategories';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { createCategory, deleteCategory, fetchCategories } from '@/store/categoriesSlice';
+import { useTranslation } from '@/i18n/useTranslation';
+import { useTheme } from '@/hooks/use-theme';
 
-const EMOJI_PRESETS = ['🐶', '🐱', '🐾', '👶', '🧸', '⚽', '🎮', '🎬', '🎵', '📚', '💊', '🏋️', '🎁', '💈', '💅', '🌿', '🔧', '🎨', '📷', '☕', '🍺', '🚲', '🚌', '✈️'];
-const COLOR_PRESETS = ['#f97316', '#ef4444', '#ec4899', '#8b5cf6', '#3b82f6', '#0ea5e9', '#06b6d4', '#10b981', '#84cc16', '#f59e0b'];
 
 export default function CategoriesScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
+  const theme = useTheme();
   const dispatch = useAppDispatch();
   const custom = useAppSelector((s) => s.categories.custom ?? []);
   const saving = useAppSelector((s) => s.expenses.saving);
   const categoriesError = useAppSelector((s) => s.categories.error);
   const [createVisible, setCreateVisible] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const suggestions = useMemo(() => getSuggestions(), [custom]);
+  const editing = (custom ?? []).find((c) => String(c.id) === String(editingId)) ?? null;
+  /** Filas swipe abiertas: solo una a la vez. */
+  const swipeRefs = useRef(new Map<string, Swipeable | null>());
+  const closeOtherRows = useCallback((exceptId: string) => {
+    swipeRefs.current.forEach((row, id) => {
+      if (id !== exceptId) row?.close();
+    });
+  }, []);
 
   useEffect(() => {
     void dispatch(fetchCategories());
   }, [dispatch]);
 
   useEffect(() => {
-    if (categoriesError) Alert.alert('Categorías', categoriesError);
-  }, [categoriesError]);
+    if (categoriesError) Alert.alert(t('categories_listAlert'), categoriesError);
+  }, [categoriesError, t]);
 
   const confirmDelete = () => {
     if (!deleteId) return;
@@ -39,54 +56,93 @@ export default function CategoriesScreen() {
     void dispatch(deleteCategory(id)).unwrap().catch(() => {});
   };
 
+  const quickAdd = (s: { label: string; emoji: string; color: string; kind: CategoryKind }) => {
+    void dispatch(createCategory({ label: s.label, emoji: s.emoji, color: s.color, kind: s.kind }))
+      .unwrap()
+      .catch((e) => Alert.alert(t('categories_listAlert'), typeof e === 'string' ? e : 'No se pudo crear'));
+  };
+
   return (
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
-          <Pressable accessibilityLabel="Volver" onPress={() => router.back()} style={styles.backBtn}>
-            <ChevronLeft size={22} color="#0F172A" />
+          <Pressable accessibilityLabel={t('categories_a11yBack')} onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+            <ChevronLeft size={22} color={theme.text} />
           </Pressable>
-          <Text variant="h2" style={styles.title}>Categorías</Text>
+          <Text style={[styles.title, { color: theme.text }]}>{t('categories_title')}</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Nueva categoría"
+            accessibilityLabel={t('categories_a11yNew')}
             onPress={() => setCreateVisible(true)}
-            style={({ pressed }) => [styles.addCircle, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [styles.addCircle, { backgroundColor: theme.backgroundElement, borderColor: theme.border }, pressed && { opacity: 0.85 }]}
           >
-            <Plus size={20} color="#2F80FF" />
+            <Plus size={20} color={theme.primary} />
           </Pressable>
         </View>
 
-        <Text variant="smallBold">Del sistema</Text>
-        <ThemedView type="backgroundElement" style={styles.listCard}>
-          {EXPENSE_CATEGORIES.map((c) => (
-            <View key={c.id} style={styles.row}>
-              <View style={[styles.iconBox, { backgroundColor: c.color + '1A', borderColor: c.color + '33' }]}>
-                <Text style={styles.emoji}>{c.emoji}</Text>
-              </View>
-              <Text variant="smallBold" style={styles.label}>{c.label}</Text>
-            </View>
-          ))}
-        </ThemedView>
-
-        <Text variant="smallBold">Mis categorías{(custom ?? []).length > 0 ? ` (${(custom ?? []).length})` : ''}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('categories_addNew')}
+          onPress={() => setCreateVisible(true)}
+        >
+          <Text variant="small" color="textSecondary">{t('categories_addNew')}</Text>
+        </Pressable>
         {(custom ?? []).length === 0 ? (
-          <ThemedView type="backgroundElement" style={styles.empty}>
-            <Text variant="small" color="textSecondary" align="center">Crea categorías con tu icono y color: aparecen en formularios, barras y presupuestos</Text>
-            <Button variant="primary" size="md" fullWidth onPress={() => setCreateVisible(true)}>+ Nueva categoría</Button>
+          <ThemedView type="backgroundElement" style={[styles.empty, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+            <Text variant="small" color="textSecondary" align="center">{t('categories_emptyHint')}</Text>
+            <Button variant="primary" size="md" fullWidth onPress={() => setCreateVisible(true)}>{t('categories_newCategory')}</Button>
           </ThemedView>
         ) : (
-          <ThemedView type="backgroundElement" style={styles.listCard}>
+          <View style={styles.list}>
             {(custom ?? []).filter(Boolean).map((c) => (
-              <View key={c.id} style={styles.row}>
-                <View style={[styles.iconBox, { backgroundColor: c.color + '1A', borderColor: c.color + '33' }]}>
-                  <Text style={styles.emoji}>{c.emoji}</Text>
-                </View>
-                <Text variant="smallBold" style={styles.label}>{c.label}</Text>
-                <Button variant="dangerOutline" size="sm" onPress={() => setDeleteId(String(c.id))}>Eliminar</Button>
-              </View>
+              <CategoryRow
+                key={String(c.id)}
+                item={{ id: String(c.id), label: c.label, emoji: c.emoji, color: c.color, kind: c.kind }}
+                onEdit={() => setEditingId(String(c.id))}
+                onTrashPress={(id) => setDeleteId(id)}
+                swipeRefs={swipeRefs}
+                onOpen={closeOtherRows}
+              />
             ))}
-          </ThemedView>
+            <CategoryRow
+              item={{ id: String(SYSTEM_CATEGORY.id), label: SYSTEM_CATEGORY.label, emoji: SYSTEM_CATEGORY.emoji, color: SYSTEM_CATEGORY.color, kind: 'GASTO' }}
+              hint={t('categories_systemLocked')}
+              swipeRefs={swipeRefs}
+              onOpen={closeOtherRows}
+            />
+          </View>
+        )}
+
+        {suggestions.length > 0 && (
+          <>
+            <Text variant="smallBold">{t('categories_suggestions')}</Text>
+            <View style={styles.list}>
+              {suggestions.map((s) => (
+                <Pressable
+                  key={String(s.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('dashboard_a11yAddSuggestion', { label: s.label })}
+                  onPress={() => quickAdd(s)}
+                  style={({ pressed }) => [styles.suggestRow, pressed && { opacity: 0.7 }]}
+                >
+                  <View style={styles.labelCol}>
+                    <Text variant="smallBold" style={styles.suggestName} numberOfLines={1}>{s.label}</Text>
+                    <View style={[styles.kindPill, { backgroundColor: theme.backgroundSelected }]}>
+                      <Text variant="caption" color="textSecondary">
+                        {s.kind === 'INGRESO' ? t('categories_kindIncome') : t('categories_kindExpense')}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={[styles.suggestIcon, { backgroundColor: `${s.color}1A` }]}>
+                    <Text style={styles.suggestEmoji}>{s.emoji}</Text>
+                  </View>
+                  <View style={[styles.suggestAdd, { borderColor: theme.border }]}>
+                    <Plus size={20} color={theme.primary} />
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          </>
         )}
       </ScrollView>
 
@@ -96,84 +152,15 @@ export default function CategoriesScreen() {
         onClose={() => setCreateVisible(false)}
         onSaved={() => setCreateVisible(false)}
       />
+      <CreateCategoryModal
+        visible={editing !== null}
+        saving={saving}
+        initial={editing}
+        onClose={() => setEditingId(null)}
+        onSaved={() => setEditingId(null)}
+      />
       <DeleteConfirm visible={deleteId !== null} onCancel={() => setDeleteId(null)} onDelete={confirmDelete} />
     </ThemedView>
-  );
-}
-
-function CreateCategoryModal({ visible, saving, onClose, onSaved }: {
-  visible: boolean;
-  saving: boolean;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const dispatch = useAppDispatch();
-  const [label, setLabel] = useState('');
-  const [emoji, setEmoji] = useState(EMOJI_PRESETS[0] ?? '📦');
-  const [color, setColor] = useState(COLOR_PRESETS[0] ?? '#a1a1aa');
-  const [attempted, setAttempted] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (visible) {
-      setLabel('');
-      setEmoji(EMOJI_PRESETS[0] ?? '📦');
-      setColor(COLOR_PRESETS[0] ?? '#a1a1aa');
-      setAttempted(false);
-      setLocalError(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
-
-  const handleSave = () => {
-    setAttempted(true);
-    setLocalError(null);
-    void dispatch(createCategory({ label: label.trim(), emoji, color }))
-      .unwrap()
-      .then(() => onSaved())
-      .catch((e) => setLocalError(typeof e === 'string' ? e : 'No se pudo crear'));
-  };
-
-  return (
-    <Modal visible={visible} variant="center" animation="fade" overlayOpacity={0.45} onDismiss={onClose}>
-      <View style={styles.form}>
-        <Text variant="smallBold" align="center">Nueva categoría</Text>
-        <Input label="Nombre" value={label} onChangeText={setLabel} placeholder="Mascotas" maxLength={24} />
-        <Text variant="small" color="textSecondary">Icono</Text>
-        <View style={styles.presetGrid}>
-          {EMOJI_PRESETS.map((e) => (
-            <Pressable
-              key={e}
-              accessibilityRole="button"
-              accessibilityLabel={`Icono ${e}`}
-              accessibilityState={{ selected: emoji === e }}
-              onPress={() => setEmoji(e)}
-              style={[styles.presetBox, emoji === e && styles.presetActive]}
-            >
-              <Text style={styles.presetEmoji}>{e}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <Text variant="small" color="textSecondary">Color</Text>
-        <View style={styles.presetGrid}>
-          {COLOR_PRESETS.map((c) => (
-            <Pressable
-              key={c}
-              accessibilityRole="button"
-              accessibilityLabel={`Color ${c}`}
-              accessibilityState={{ selected: color === c }}
-              onPress={() => setColor(c)}
-              style={[styles.colorBox, { backgroundColor: c }, color === c && styles.presetActive]}
-            />
-          ))}
-        </View>
-        {(attempted && localError) && <Text variant="small" color="danger">{localError}</Text>}
-        <View style={styles.footer}>
-          <Button variant="primary" size="md" style={{ flex: 1 }} loading={saving} onPress={handleSave}>Guardar</Button>
-          <Button variant="ghost" size="md" style={{ flex: 1 }} onPress={onClose}>Cancelar</Button>
-        </View>
-      </View>
-    </Modal>
   );
 }
 
@@ -181,20 +168,16 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: Spacing.four, gap: Spacing.three, paddingTop: 60, paddingBottom: 40 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E6E9F2' },
-  title: { fontSize: 20, fontWeight: '700', color: '#0F172A', flex: 1 },
-  addCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E6E9F2' },
-  listCard: { borderRadius: 16, padding: Spacing.three, gap: Spacing.two, borderWidth: 1, borderColor: '#E6E9F2', backgroundColor: '#FFFFFF' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  iconBox: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  emoji: { fontSize: 20 },
-  label: { flex: 1 },
-  empty: { borderRadius: 16, padding: Spacing.four, alignItems: 'center', gap: Spacing.two, borderWidth: 1, borderColor: '#E6E9F2', backgroundColor: '#FFFFFF' },
-  form: { width: '100%', gap: Spacing.two },
-  presetGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  presetBox: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E6E9F2', backgroundColor: '#FFFFFF' },
-  presetActive: { borderColor: '#2F80FF', borderWidth: 2 },
-  presetEmoji: { fontSize: 20 },
-  colorBox: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: '#E6E9F2' },
-  footer: { flexDirection: 'row', gap: Spacing.two },
+  backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  title: { fontSize: 30, lineHeight: 38, fontWeight: '800', fontFamily: Fonts.sans, flex: 1 },
+  addCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  list: { gap: Spacing.one },
+  suggestRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: 10 },
+  suggestName: { fontSize: 18, fontWeight: '700', fontFamily: Fonts.sans },
+  kindPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' },
+  suggestIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  suggestEmoji: { fontSize: 24 },
+  suggestAdd: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  labelCol: { flex: 1, gap: 6 },
+  empty: { borderRadius: 16, padding: Spacing.four, alignItems: 'center', gap: Spacing.two, borderWidth: 1 },
 });

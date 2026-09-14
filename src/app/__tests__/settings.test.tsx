@@ -29,17 +29,52 @@ function renderWithStore() {
 }
 
 describe('Settings budgets', () => {
-  it('la fila Budgets abre el modal de presupuestos', async () => {
+  it('la fila Presupuestos navega a la pantalla', async () => {
     const { getByText } = renderWithStore();
-    await waitFor(() => expect(getByText('Budgets')).toBeTruthy());
-    fireEvent.press(getByText('Budgets'));
-    await waitFor(() => expect(getByText('Nuevo presupuesto')).toBeTruthy());
+    await waitFor(() => expect(getByText('Presupuestos')).toBeTruthy());
+    fireEvent.press(getByText('Presupuestos'));
+    expect(mockPush).toHaveBeenCalledWith('/budgets');
   });
 
   it('la fila Categories navega a la pantalla', async () => {
     const { getByText } = renderWithStore();
-    await waitFor(() => expect(getByText('Categories')).toBeTruthy());
-    fireEvent.press(getByText('Categories'));
+    await waitFor(() => expect(getByText('Categorías')).toBeTruthy());
+    fireEvent.press(getByText('Categorías'));
     expect(mockPush).toHaveBeenCalledWith('/categories');
+  });
+
+  it('tiene botón Volver en el header', async () => {
+    const { getByLabelText, getByText } = renderWithStore();
+    await waitFor(() => expect(getByText('Configuración')).toBeTruthy());
+    expect(getByLabelText('Volver')).toBeTruthy();
+  });
+
+  it('Apariencia permite elegir Dark mode', async () => {
+    const { getByText } = renderWithStore();
+    await waitFor(() => expect(getByText('Apariencia')).toBeTruthy());
+    fireEvent.press(getByText('Apariencia'));
+    await waitFor(() => expect(getByText('Modo oscuro')).toBeTruthy());
+    fireEvent.press(getByText('Modo oscuro'));
+    await waitFor(() => expect(getByText('Modo oscuro')).toBeTruthy());
+  });
+
+  it('Idioma permite elegir English', async () => {
+    const { getByText } = renderWithStore();
+    await waitFor(() => expect(getByText('Idioma')).toBeTruthy());
+    fireEvent.press(getByText('Idioma'));
+    await waitFor(() => expect(getByText('English')).toBeTruthy());
+    fireEvent.press(getByText('English'));
+    await waitFor(() => expect(getByText('English')).toBeTruthy());
+  });
+
+  it('Moneda abre el buscador y cambia a USD', async () => {
+    const { getByText, getByTestId, getByLabelText } = renderWithStore();
+    await waitFor(() => expect(getByText('Moneda')).toBeTruthy());
+    fireEvent.press(getByText('Moneda'));
+    await waitFor(() => expect(getByTestId('currency-search-input')).toBeTruthy());
+    fireEvent.changeText(getByTestId('currency-search-input'), 'dolar');
+    await waitFor(() => expect(getByText('dólar estadounidense')).toBeTruthy());
+    fireEvent.press(getByLabelText('Usar USD'));
+    await waitFor(() => expect(getByText('dólar estadounidense · USD')).toBeTruthy());
   });
 });

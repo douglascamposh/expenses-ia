@@ -4,6 +4,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { DashboardScreen } from '../index';
 import expensesReducer from '@/store/expensesSlice';
 import settingsReducer from '@/store/settingsSlice';
+import categoriesReducer from '@/store/categoriesSlice';
 
 // Payload con la forma exacta del backend (/api/analyze)
 const analyzeResult = {
@@ -57,7 +58,7 @@ afterEach(() => {
 describe('contrato /api/analyze → cola de voz', () => {
   it('paymentMethod del backend llega al draft normalizado', async () => {
     const testStore = configureStore({
-      reducer: { expenses: expensesReducer, settings: settingsReducer },
+      reducer: { expenses: expensesReducer, settings: settingsReducer, categories: categoriesReducer },
       middleware: (g) => g({ serializableCheck: false }),
     });
     const { getByLabelText, getByText } = render(

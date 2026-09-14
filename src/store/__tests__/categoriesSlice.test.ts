@@ -67,6 +67,21 @@ describe('categories slice', () => {
     expect(store.getState().categories.error).toBeTruthy();
   });
 
+  it('createCategory rechaza duplicados (sin importar mayúsculas/tildes)', async () => {
+    const store = makeStore();
+    await store.dispatch(createCategory({ label: 'Mascotas', emoji: '🐶', color: '#f97316' })).unwrap();
+    await expect(
+      store.dispatch(createCategory({ label: 'mascotas', emoji: '🐱', color: '#ef4444' })).unwrap(),
+    ).rejects.toMatch(/existe/);
+    await expect(
+      store.dispatch(createCategory({ label: 'MÁSCOTAS', emoji: '🐱', color: '#ef4444' })).unwrap(),
+    ).rejects.toMatch(/existe/);
+    await expect(
+      store.dispatch(createCategory({ label: 'Otros', emoji: '📦', color: '#a1a1aa' })).unwrap(),
+    ).rejects.toMatch(/existe/);
+    expect(store.getState().categories.custom).toHaveLength(1);
+  });
+
   it('deleteCategory bloquea defaults y categorías en uso', async () => {
     const store = makeStore();
     await expect(store.dispatch(deleteCategory('FOOD')).unwrap()).rejects.toMatch(/sistema/);
@@ -74,7 +89,7 @@ describe('categories slice', () => {
     await store.dispatch(fetchCategories()).unwrap();
     await memExp.create({
       id: 'e1', amount: 10, currency: 'BOB', category: 'MASCOTAS' as never, description: 'Vet',
-      date: '2026-09-07', paymentMethod: 'CASH', createdAt: '2026-09-07T00:00:00.000Z', updatedAt: '2026-09-07T00:00:00.000Z',
+      date: '2026-09-07', paymentMethod: 'CASH', kind: 'EXPENSE', createdAt: '2026-09-07T00:00:00.000Z', updatedAt: '2026-09-07T00:00:00.000Z',
     });
     await expect(store.dispatch(deleteCategory('MASCOTAS')).unwrap()).rejects.toMatch(/gastos/);
     await memExp.clearAll();

@@ -72,4 +72,28 @@ describe('validateExpenseCommand', () => {
     expect(res.valid).toBe(false);
     expect(res.errors.join(' ')).toMatch(/paymentMethod/);
   });
+
+  it('kind ausente → default EXPENSE', () => {
+    const res = validateExpenseCommand({ ...base });
+    expect(res.valid).toBe(true);
+    expect(res.normalized?.kind).toBe('EXPENSE');
+  });
+
+  it('kind INCOME válido → se conserva', () => {
+    const res = validateExpenseCommand({ ...base, expense: { ...base.expense, kind: 'INCOME' } });
+    expect(res.valid).toBe(true);
+    expect(res.normalized?.kind).toBe('INCOME');
+  });
+
+  it('kind inválido → rejected', () => {
+    const res = validateExpenseCommand({ ...base, expense: { ...base.expense, kind: 'REGALO' } });
+    expect(res.valid).toBe(false);
+    expect(res.errors.join(' ')).toMatch(/kind/);
+  });
+
+  it('categoría desconocida → rejected (la UI resuelve a la default)', () => {
+    const res = validateExpenseCommand({ ...base, expense: { ...base.expense, category: 'NOEXISTE' } });
+    expect(res.valid).toBe(false);
+    expect(res.errors.join(' ')).toMatch(/category/);
+  });
 });
