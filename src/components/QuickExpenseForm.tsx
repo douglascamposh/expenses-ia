@@ -3,17 +3,31 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native
 import { Banknote, Check, ChevronDown, CreditCard, Plus } from 'lucide-react-native';
 import { Text } from '@/components/ui';
 import { CreateCategoryModal } from '@/components/CreateCategoryModal';
+import { RecurrenceModal } from '@/components/RecurrenceModal';
 import { DatePickerModal, formatDateDisplay } from '@/components/DatePickerModal';
 import { Toast } from '@/components/Toast';
 import { Fonts, Spacing } from '@/constants/theme';
 import { SYSTEM_CATEGORY, getAllCategories, getCategoryConfig, isUserCategory } from '@/expenses/categories/expenseCategories';
 import { getCurrencySymbol } from '@/expenses/utils/format';
-import type { Currency, EntryKind, NewExpense } from '@/expenses/models/Expense';
+import type { Currency, EntryKind, Frequency, NewExpense } from '@/expenses/models/Expense';
+import type { StringKey } from '@/i18n/translations';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useTheme } from '@/hooks/use-theme';
 
 const INCOME_GREEN = '#5A9E4B';
 const EXPENSE_RED = '#F0524D';
+
+/** Etiqueta del chip según recurrencia del borrador. */
+export const RECUR_LABEL_KEYS: Record<Frequency, StringKey> = {
+  ONCE: 'recur_once',
+  DAILY: 'recur_daily',
+  WEEKLY: 'recur_weekly',
+  BIWEEKLY: 'recur_biweekly',
+  MONTHLY: 'recur_monthly',
+  BIMONTHLY: 'recur_bimonthly',
+  QUARTERLY: 'recur_quarterly',
+  ANNUAL: 'recur_annual',
+};
 
 type Props = {
   value: NewExpense;
@@ -35,9 +49,11 @@ export function QuickExpenseForm({ value, onChange, defaultCurrency, onSave, ini
   const theme = useTheme();
   const [dateOpen, setDateOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [recurOpen, setRecurOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: 'error' | 'info' } | null>(null);
 
   const kind: EntryKind = value.kind ?? 'EXPENSE';
+  const recurrence: Frequency = value.recurrence ?? 'ONCE';
   const kindColor = kind === 'INCOME' ? INCOME_GREEN : EXPENSE_RED;
   const symbol = getCurrencySymbol(defaultCurrency);
   const categories = getAllCategories().filter(
@@ -98,10 +114,15 @@ export function QuickExpenseForm({ value, onChange, defaultCurrency, onSave, ini
           <Text variant="smallBold">{isToday ? t('quick_today') : formatDateDisplay(value.date)}</Text>
           <ChevronDown size={14} color={theme.textSecondary} />
         </Pressable>
-        <View style={[styles.miniChip, { backgroundColor: theme.backgroundSelected }]}>
-          <Text variant="smallBold" style={{ color: theme.textSecondary }}>{t('quick_once')}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('quick_a11yRecurrence')}
+          onPress={() => setRecurOpen(true)}
+          style={[styles.miniChip, { backgroundColor: theme.backgroundSelected }]}
+        >
+          <Text variant="smallBold" style={{ color: theme.textSecondary }}>{t(RECUR_LABEL_KEYS[recurrence])}</Text>
           <ChevronDown size={14} color={theme.textSecondary} />
-        </View>
+        </Pressable>
       </View>
 
       <TextInput
@@ -207,6 +228,15 @@ export function QuickExpenseForm({ value, onChange, defaultCurrency, onSave, ini
         onSelect={(date) => {
           onChange({ date });
           setDateOpen(false);
+        }}
+      />
+      <RecurrenceModal
+        visible={recurOpen}
+        selected={recurrence}
+        onClose={() => setRecurOpen(false)}
+        onSelect={(f) => {
+          onChange({ recurrence: f });
+          setRecurOpen(false);
         }}
       />
       {/* + abre directo el formulario de nueva categoría (sin lista intermedia). */}

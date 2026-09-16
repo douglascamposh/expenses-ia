@@ -298,7 +298,7 @@ describe('getDatabase single-flight', () => {
     const versions = runCalls
       .filter((a) => String(a[0]).includes('_migrations'))
       .map((a) => (a[1] as unknown[])[0]);
-    expect(versions).toEqual([2, 3, 4, 5, 6, 7, 8]);
+    expect(versions).toEqual([2, 3, 4, 5, 6, 7, 8, 9]);
     expect(sqliteMock.deleteDatabaseAsync).not.toHaveBeenCalled();
   });
 

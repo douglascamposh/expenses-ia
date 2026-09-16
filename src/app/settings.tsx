@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Check, ChevronLeft, ChevronRight, CircleDollarSign, FileText, Globe, Info, Layers, Moon, PiggyBank, Shield, Cpu, TrendingUp } from 'lucide-react-native';
+import { Check, ChevronLeft, ChevronRight, CircleDollarSign, FileText, Globe, Info, Layers, Moon, PiggyBank, Repeat, Shield, Cpu, TrendingUp } from 'lucide-react-native';
 import { ThemedView } from '@/components/themed-view';
 import { CurrencyModal } from '@/components/CurrencyModal';
 import { Modal } from '@/components/ui/Modal';
@@ -19,6 +19,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const budgets = useAppSelector((s) => s.expenses.budgets ?? []);
+  const recurringCount = useAppSelector((s) => s.recurring?.rules?.length ?? 0);
   const defaultCurrency = useAppSelector((s) => s.settings.defaultCurrency);
   const skipIncome = useAppSelector((s) => s.settings.skipIncome ?? false);
   const language = useAppSelector((s) => s.settings.language ?? 'system');
@@ -55,6 +56,7 @@ export default function SettingsScreen() {
           <SettingRow icon={CircleDollarSign} label={t('settings_currency')} subtitle={currencySubtitle} onPress={() => setCurrencyVisible(true)} />
           <SettingRow icon={Layers} label={t('settings_categories')} onPress={() => router.push('/categories' as never)} />
           <SettingRow icon={PiggyBank} label={t('settings_budgets')} subtitle={budgets.length > 0 ? t('settings_budgetsValue', { n: budgets.length }) : t('settings_noBudgets')} onPress={() => router.push('/budgets' as never)} />
+          <SettingRow icon={Repeat} label={t('settings_recurring')} subtitle={recurringCount > 0 ? t('settings_recurringValue', { n: recurringCount }) : t('settings_noRecurring')} onPress={() => router.push('/recurring' as never)} />
           <SettingRow
             icon={TrendingUp}
             label={t('settings_trackIncome')}

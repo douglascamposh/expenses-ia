@@ -21,6 +21,7 @@ function freshDraft(currency: Currency = DEFAULT_CURRENCY): NewExpense {
     description: '',
     date: todayISO(),
     paymentMethod: 'CASH',
+    recurrence: 'ONCE',
   };
 }
 

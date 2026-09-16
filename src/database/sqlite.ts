@@ -5,7 +5,7 @@ let db: SQLite.SQLiteDatabase | null = null;
 let dbInit: Promise<SQLite.SQLiteDatabase> | null = null;
 
 const DB_NAME = 'expenses.db';
-const DB_VERSION = 8;
+const DB_VERSION = 9;
 
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (db) return db;
@@ -285,6 +285,41 @@ async function migrate(database: SQLite.SQLiteDatabase) {
     await database.runAsync('INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (?, ?)', [8, new Date().toISOString()]);
   }
 
+  if (current < 9) {
+    // Reglas recurrentes + vínculo en gastos generados.
+    await database.execAsync(`
+      CREATE TABLE IF NOT EXISTS recurring_rules (
+        id TEXT PRIMARY KEY NOT NULL,
+        description TEXT NOT NULL,
+        amount REAL NOT NULL,
+        currency TEXT NOT NULL,
+        category TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'EXPENSE',
+        frequency TEXT NOT NULL DEFAULT 'MONTHLY',
+        day1 INTEGER NOT NULL DEFAULT 1,
+        day2 INTEGER,
+        weekday INTEGER,
+        month INTEGER,
+        payment_method TEXT NOT NULL DEFAULT 'CASH',
+        start_date TEXT NOT NULL,
+        end_date TEXT,
+        active INTEGER NOT NULL DEFAULT 1,
+        last_generated TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_recurring_active ON recurring_rules(active);
+    `);
+    try {
+      await database.execAsync(`ALTER TABLE expenses ADD COLUMN recurring_id TEXT;`);
+    } catch (e) {
+      const msg = String((e as Error)?.message ?? e ?? '').toLowerCase();
+      if (!msg.includes('duplicate column')) throw e;
+      if (__DEV__) console.warn('[sqlite] recurring_id ya existe, se continúa');
+    }
+    await database.runAsync('INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (?, ?)', [9, new Date().toISOString()]);
+  }
+
   // Reparación defensiva (corre siempre): si una migración vieja quedó marcada
   // como aplicada sin crear sus columnas (p. ej. v8 interrumpida → la app
   // fallaba con "no such column budget_amount"), se agregan aquí.
@@ -292,6 +327,7 @@ async function migrate(database: SQLite.SQLiteDatabase) {
   await ensureColumn(database, 'custom_categories', 'kind', `kind TEXT NOT NULL DEFAULT 'GASTO'`);
   await ensureColumn(database, 'custom_categories', 'budget_amount', `budget_amount REAL NOT NULL DEFAULT 0`);
   await ensureColumn(database, 'custom_categories', 'budget_currency', `budget_currency TEXT NOT NULL DEFAULT 'BOB'`);
+  await ensureColumn(database, 'expenses', 'recurring_id', `recurring_id TEXT`);
 }
 
 /**

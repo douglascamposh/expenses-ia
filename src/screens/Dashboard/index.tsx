@@ -42,6 +42,8 @@ import {
   updateExpense,
 } from '@/store/expensesSlice';
 import { createCategory } from '@/store/categoriesSlice';
+import { createRule, generateRecurrences, saveRecurringDraft } from '@/store/recurringSlice';
+import { draftToRuleInput } from '@/expenses/services/recurring';
 import { setSkipIncome } from '@/store/settingsSlice';
 import { AnalyticsAnswerCard } from '@/components/AnalyticsAnswerCard';
 import { CategoryCarousel, COLLAPSE_D } from '@/components/CategoryCarousel';
@@ -181,6 +183,8 @@ export function DashboardScreen() {
 
   useEffect(() => {
     void dispatch(fetchExpenses(10));
+    // Recurrentes vencidos (idempotente): materializa y refresca si creó.
+    void dispatch(generateRecurrences());
   }, [dispatch]);
 
   useEffect(() => {
@@ -391,13 +395,14 @@ export function DashboardScreen() {
 
   const handleSaveManual = useCallback(
     (draft: NewExpense) => {
-      // Snapshot serializable; el thunk createExpense guarda en SQLite y refresca.
+      // Snapshot serializable; con recurrencia crea regla + gasto actual.
       // El modal solo se cierra si el guardado cumple (saveError se muestra vía useEffect).
       const snapshot = JSON.parse(JSON.stringify(draft)) as NewExpense;
-      void dispatch(createExpense(snapshot))
-        .unwrap()
-        .then(() => setManualVisible(false))
-        .catch(() => {});
+      const op =
+        snapshot.recurrence && snapshot.recurrence !== 'ONCE'
+          ? dispatch(saveRecurringDraft(snapshot)).unwrap()
+          : dispatch(createExpense(snapshot)).unwrap();
+      void op.then(() => setManualVisible(false)).catch(() => {});
     },
     [dispatch],
   );
@@ -832,7 +837,26 @@ export function DashboardScreen() {
         onSave={(patch) => {
           const id = selected?.id;
           if (!id) return;
-          void dispatch(updateExpense({ id, patch }))
+          const { recurrence, ...rest } = patch as Partial<Expense> & { recurrence?: NewExpense['recurrence'] };
+          // Al editar con recurrencia y sin regla: crearla y vincular el gasto.
+          if (recurrence && recurrence !== 'ONCE' && !selected?.recurringId) {
+            const ruleInput = draftToRuleInput({
+              ...(rest as NewExpense),
+              recurrence,
+              date: (rest.date ?? selected?.date) as string,
+            });
+            void dispatch(createRule(ruleInput))
+              .unwrap()
+              .then((created) =>
+                dispatch(updateExpense({ id, patch: { ...rest, recurringId: created.rule.id } }))
+                  .unwrap()
+                  .then(() => setSelected(null))
+                  .catch((e) => Alert.alert(t('dashboard_updateError'), typeof e === 'string' ? e : t('common_unexpected'))),
+              )
+              .catch((e) => Alert.alert(t('dashboard_updateError'), typeof e === 'string' ? e : t('common_unexpected')));
+            return;
+          }
+          void dispatch(updateExpense({ id, patch: rest }))
             .unwrap()
             .then(() => setSelected(null))
             .catch((e) => Alert.alert(t('dashboard_updateError'), typeof e === 'string' ? e : t('common_unexpected')));

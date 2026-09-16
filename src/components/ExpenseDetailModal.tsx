@@ -5,7 +5,7 @@ import { X } from 'lucide-react-native';
 import { Modal } from '@/components/ui/Modal';
 import { QuickExpenseForm } from '@/components/QuickExpenseForm';
 import { Spacing } from '@/constants/theme';
-import type { Expense, NewExpense } from '@/expenses/models/Expense';
+import type { Expense, Frequency, NewExpense } from '@/expenses/models/Expense';
 import { useTranslation } from '@/i18n/useTranslation';
 
 type Props = {
@@ -13,8 +13,8 @@ type Props = {
   visible: boolean;
   saving?: boolean;
   onClose: () => void;
-  /** Guarda el borrador editado (la pantalla despacha updateExpense). */
-  onSave: (patch: Partial<Expense>) => void;
+  /** Guarda el borrador editado (la pantalla despacha updateExpense / regla). */
+  onSave: (patch: Partial<Expense> & { recurrence?: Frequency }) => void;
 };
 
 /** Separa un #tag final de la descripción para editarlo aparte. */
@@ -63,6 +63,7 @@ export function ExpenseDetailModal({ expense, visible, saving, onClose, onSave }
       currency: d.currency,
       date: d.date,
       paymentMethod: d.paymentMethod ?? 'CASH',
+      recurrence: d.recurrence ?? 'ONCE',
     });
   };
 

@@ -104,6 +104,17 @@ describe('ManualExpenseModal (flujo mockup)', () => {
     }
   });
 
+  it('chip de recurrencia default Una vez y cambia a Mensual', async () => {
+    const { getByText, getByLabelText } = render(
+      <ManualExpenseModal visible saving={false} onClose={() => {}} onSave={() => {}} />,
+    );
+    await waitFor(() => expect(getByText('Una vez')).toBeTruthy());
+    fireEvent.press(getByLabelText('Cambiar recurrencia'));
+    await waitFor(() => expect(getByText('Repetir')).toBeTruthy());
+    fireEvent.press(getByLabelText('Mensual'));
+    await waitFor(() => expect(getByText('Mensual')).toBeTruthy());
+  });
+
   it('usa la moneda por defecto recibida y ya no hay campo etiqueta', async () => {
     const onSave = jest.fn();
     const { getByPlaceholderText, getByLabelText, queryByPlaceholderText } = render(

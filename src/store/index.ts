@@ -1,12 +1,14 @@
 import { configureStore } from '@reduxjs/toolkit';
 import categoriesReducer, { fetchCategories } from './categoriesSlice';
 import expensesReducer from './expensesSlice';
+import recurringReducer from './recurringSlice';
 import settingsReducer, { fetchSettings } from './settingsSlice';
 
 export const store = configureStore({
   reducer: {
     categories: categoriesReducer,
     expenses: expensesReducer,
+    recurring: recurringReducer,
     settings: settingsReducer,
   },
   // SQLite devuelve objetos planos; no se necesita serializableCheck especial.

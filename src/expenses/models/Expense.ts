@@ -11,6 +11,15 @@ export const DEFAULT_CURRENCY: Currency = 'BOB';
 
 export type PaymentMethod = 'CASH' | 'CARD';
 
+/** Frecuencia de repetición (formulario + reglas recurrentes). */
+export type Frequency =
+  | 'ONCE' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'BIMONTHLY' | 'QUARTERLY' | 'ANNUAL';
+
+export function isValidFrequency(f: unknown): f is Frequency {
+  return f === 'ONCE' || f === 'DAILY' || f === 'WEEKLY' || f === 'BIWEEKLY' ||
+    f === 'MONTHLY' || f === 'BIMONTHLY' || f === 'QUARTERLY' || f === 'ANNUAL';
+}
+
 export type AppLang = 'es' | 'en';
 
 /** Gasto o ingreso. Los ingresos no suman a presupuestos ni totales de gasto. */
@@ -54,6 +63,8 @@ export interface Expense {
   confidence?: number;
   createdAt: string; // ISO 8601
   updatedAt: string;
+  /** Id de la regla que lo generó (si es recurrente). */
+  recurringId?: string | null;
 }
 
 // Para crear sin id/timestamps
@@ -61,6 +72,8 @@ export type NewExpense = Omit<Expense, 'id' | 'createdAt' | 'updatedAt'> & {
   id?: string;
   createdAt?: string;
   updatedAt?: string;
+  /** Solo formulario: si no es ONCE se crea regla recurrente al guardar. */
+  recurrence?: Frequency;
 };
 
 export function isValidCurrency(c: string): c is Currency {

@@ -36,6 +36,7 @@ export function rowToExpense(row: Record<string, unknown>): Expense {
     confidence: (row.confidence as number | null) ?? undefined,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
+    recurringId: (row.recurring_id as string | null | undefined) ?? null,
   };
 }
 
@@ -43,9 +44,9 @@ export class SqliteExpenseRepository implements ExpenseRepository {
   async create(expense: Expense): Promise<Expense> {
     const db = await getDatabase();
     await db.runAsync(
-      `INSERT INTO expenses (id, amount, currency, category, kind, description, date, payment_method, confidence, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [expense.id, expense.amount, expense.currency, expense.category, expense.kind ?? 'EXPENSE', expense.description, expense.date, expense.paymentMethod ?? 'CASH', expense.confidence ?? null, expense.createdAt, expense.updatedAt],
+      `INSERT INTO expenses (id, amount, currency, category, kind, description, date, payment_method, confidence, created_at, updated_at, recurring_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [expense.id, expense.amount, expense.currency, expense.category, expense.kind ?? 'EXPENSE', expense.description, expense.date, expense.paymentMethod ?? 'CASH', expense.confidence ?? null, expense.createdAt, expense.updatedAt, expense.recurringId ?? null],
     );
     return expense;
   }
@@ -147,8 +148,8 @@ export class SqliteExpenseRepository implements ExpenseRepository {
       updatedAt: new Date().toISOString(),
     };
     await db.runAsync(
-      `UPDATE expenses SET amount = ?, currency = ?, category = ?, kind = ?, description = ?, date = ?, payment_method = ?, confidence = ?, updated_at = ? WHERE id = ?`,
-      [updated.amount, updated.currency, updated.category, updated.kind ?? 'EXPENSE', updated.description, updated.date, updated.paymentMethod ?? 'CASH', updated.confidence ?? null, updated.updatedAt, id],
+      `UPDATE expenses SET amount = ?, currency = ?, category = ?, kind = ?, description = ?, date = ?, payment_method = ?, confidence = ?, updated_at = ?, recurring_id = ? WHERE id = ?`,
+      [updated.amount, updated.currency, updated.category, updated.kind ?? 'EXPENSE', updated.description, updated.date, updated.paymentMethod ?? 'CASH', updated.confidence ?? null, updated.updatedAt, updated.recurringId ?? null, id],
     );
     return updated;
   }
