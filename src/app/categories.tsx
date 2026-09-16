@@ -36,6 +36,8 @@ export default function CategoriesScreen() {
   const [blockedToast, setBlockedToast] = useState<string | null>(null);
   const suggestions = useMemo(() => getSuggestions(), [custom]);
   const editing = (custom ?? []).find((c) => String(c.id) === String(editingId)) ?? null;
+  /** Categoría pendiente de borrado: da el nombre para el texto de confirmación. */
+  const deleting = (custom ?? []).find((c) => String(c.id) === String(deleteId)) ?? null;
   /** Filas swipe abiertas: solo una a la vez. */
   const swipeRefs = useRef(new Map<string, Swipeable | null>());
   const closeOtherRows = useCallback((exceptId: string) => {
@@ -179,7 +181,13 @@ export default function CategoriesScreen() {
         onClose={() => setEditingId(null)}
         onSaved={() => setEditingId(null)}
       />
-      <DeleteConfirm visible={deleteId !== null} onCancel={() => setDeleteId(null)} onDelete={confirmDelete} />
+      <DeleteConfirm
+        visible={deleteId !== null}
+        title={t('deleteConfirm_categoryTitle')}
+        description={deleting ? t('deleteConfirm_categoryDesc', { label: deleting.label }) : undefined}
+        onCancel={() => setDeleteId(null)}
+        onDelete={confirmDelete}
+      />
       <Toast visible={blockedToast !== null} message={blockedToast ?? ''} tone="error" onDismiss={() => setBlockedToast(null)} />
     </ThemedView>
   );

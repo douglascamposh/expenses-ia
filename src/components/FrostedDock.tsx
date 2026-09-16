@@ -2,12 +2,17 @@ import { StyleSheet, View } from 'react-native';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /**
  * Blur progresivo tras los flotantes (mockup): el degradado actúa como
  * máscara — arriba el blur desaparece, abajo es completo. No captura toques.
+ * El tint sigue el tema: en claro aclara, en oscuro oscurece (si no, sobre
+ * el fondo oscuro el degradado se veía blanquecino).
  */
 export function FrostedDock({ height = 140 }: { height?: number }) {
+  const scheme = useColorScheme();
+  const isDark = scheme === 'dark';
   return (
     <View style={[styles.dock, { height }]} pointerEvents="none">
       <MaskedView
@@ -22,7 +27,7 @@ export function FrostedDock({ height = 140 }: { height?: number }) {
           />
         }
       >
-        <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} />
+        <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
       </MaskedView>
     </View>
   );

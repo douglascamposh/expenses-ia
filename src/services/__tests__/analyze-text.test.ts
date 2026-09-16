@@ -1,4 +1,4 @@
-import { analyzeText, normalizeAnalyzeResponse, AnalyzeError, ANALYZE_TEXT_ENDPOINT } from '../expense-api';
+import { analyzeText, normalizeAnalyzeResponse, AnalyzeError, ANALYZE_TEXT_ENDPOINT, isServiceUnavailable } from '../expense-api';
 
 const realFetch = globalThis.fetch;
 
@@ -72,5 +72,32 @@ describe('analyzeText (/api/analyze-text)', () => {
     expect(normalizeAnalyzeResponse({ result: [e] })).toEqual([e]);
     expect(normalizeAnalyzeResponse({ actions: [{ action: 'X', expense: e }] })).toHaveLength(1);
     expect(normalizeAnalyzeResponse({})).toEqual([]);
+  });
+
+  it('isServiceUnavailable detecta el 503 de alta demanda del modelo', async () => {
+    // El backend responde 503 con el detalle del modelo saturado.
+    mockFetchOnce(
+      { error: 'this model is currently experiencing high demand, status: unavailable' },
+      false,
+      503,
+    );
+    const failure = await analyzeText('hola').catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(AnalyzeError);
+    expect(isServiceUnavailable(failure)).toBe(true);
+  });
+
+  it('isServiceUnavailable cubre estados y textos de servicio caído', () => {
+    // Estados transitorios del servicio
+    for (const status of [429, 500, 502, 503, 504]) {
+      expect(isServiceUnavailable(new AnalyzeError('boom', status))).toBe(true);
+    }
+    // Texto del backend aunque no venga status
+    expect(isServiceUnavailable(new Error('service overloaded, try again later'))).toBe(true);
+    expect(isServiceUnavailable(new Error('RESOURCE EXHAUSTED'))).toBe(true);
+    // Errores del request del usuario no se clasifican como servicio caído
+    expect(isServiceUnavailable(new AnalyzeError('Texto vacío para embedding', 400))).toBe(false);
+    expect(isServiceUnavailable(new Error('Gasto inválido'))).toBe(false);
+    expect(isServiceUnavailable(null)).toBe(false);
+    expect(isServiceUnavailable(undefined)).toBe(false);
   });
 });

@@ -143,6 +143,25 @@ describe('VoiceTextScreen (PoC transcripción)', () => {
     expect(mockBack).not.toHaveBeenCalled();
   });
 
+  it('✓ con 503 de alta demanda muestra toast amable y no el error crudo', async () => {
+    (globalThis as { fetch?: unknown }).fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 503,
+        json: () => Promise.resolve({ error: 'this model is currently experiencing high demand, status: unavailable' }),
+      }),
+    );
+    const { __listeners } = speechMocks();
+    const { getByLabelText, getByText, queryByText } = renderScreen();
+    await waitFor(() => expect(__listeners.start).toBeDefined());
+    act(() => { __listeners.start(undefined as never); });
+    act(() => { __listeners.result({ results: [{ transcript: 'Uber 25' }], isFinal: true } as never); });
+    fireEvent.press(getByLabelText('Guardar transcripción'));
+    await waitFor(() => expect(getByText('El servicio no está disponible ahora. Reintenta más tarde.')).toBeTruthy());
+    expect(queryByText(/high demand/)).toBeNull();
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
   it('con celular en es-AR usa su modelo sin descargar y muestra su bandera', async () => {
     const localization = jest.requireMock('expo-localization') as { getLocales: jest.Mock };
     localization.getLocales.mockReturnValueOnce([{ languageCode: 'es', languageTag: 'es-AR' }]);

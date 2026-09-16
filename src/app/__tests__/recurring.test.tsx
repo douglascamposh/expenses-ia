@@ -80,8 +80,8 @@ describe('RecurringScreen', () => {
       expect(recurringRepository.update).toHaveBeenCalledWith('r2', { active: false }),
     );
     fireEvent.press(getByLabelText('Eliminar regla Alquiler'));
-    await waitFor(() => expect(getByText('Delete expense?')).toBeTruthy());
-    fireEvent.press(getByText('Delete'));
+    await waitFor(() => expect(getByText('¿Eliminar regla?')).toBeTruthy());
+    fireEvent.press(getByText('Eliminar'));
     await waitFor(() => expect(recurringRepository.remove).toHaveBeenCalledWith('r2'));
   });
 

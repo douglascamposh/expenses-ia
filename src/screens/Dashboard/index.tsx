@@ -26,6 +26,7 @@ import { formatCurrency, formatDateLabel, formatMonthLabel, formatMonthRange, ge
 import { groupRecent } from '@/expenses/utils/groupRecent';
 import { useAudioRecording } from '@/hooks/use-audio-recording';
 import { useAnalyzeAudio } from '@/hooks/use-analyze-audio';
+import { isServiceUnavailable } from '@/services/expense-api';
 import { useBudgetAlerts } from '@/hooks/use-budget-alerts';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -62,6 +63,8 @@ export function DashboardScreen() {
   const analyzer = useAnalyzeAudio();
   /** Sin push nativa (Expo Go): la alerta de presupuesto se muestra en-app. */
   const [budgetToast, setBudgetToast] = useState<{ title: string; body: string } | null>(null);
+  /** Avisos de la grabación/análisis de voz (error de servicio → tono error). */
+  const [voiceToast, setVoiceToast] = useState<{ message: string; tone: 'info' | 'error' } | null>(null);
   useBudgetAlerts(useCallback((title: string, body: string) => setBudgetToast({ title, body }), []));
   const dispatch = useAppDispatch();
   const recent = useAppSelector((s) => s.expenses.recent ?? []);
@@ -132,8 +135,6 @@ export function DashboardScreen() {
   }, []);
   /** Bubble confirmar eliminación (swipe → papelera). */
   const [bubbleExpense, setBubbleExpense] = useState<Expense | null>(null);
-  /** Toast no bloqueante (p. ej. voz sin match de categoría). */
-  const [voiceToast, setVoiceToast] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   /** Búsqueda abierta (dock iOS / barra Android). Al escribir filtra la lista del inicio. */
   const [searchOpen, setSearchOpen] = useState(false);
@@ -257,9 +258,14 @@ export function DashboardScreen() {
               });
           }
           dispatch(setPendingQueue(queue));
-          if (unmatchedCategory) setVoiceToast(t('voice_noMatch'));
+          if (unmatchedCategory) setVoiceToast({ message: t('voice_noMatch'), tone: 'info' });
         } catch (e) {
-          Alert.alert(t('dashboard_analyzeError'), (e as Error).message);
+          // Servicio saturado (503/alta demanda): mensaje amable en vez del error crudo.
+          if (isServiceUnavailable(e)) {
+            setVoiceToast({ message: t('common_serviceUnavailable'), tone: 'error' });
+          } else {
+            Alert.alert(t('dashboard_analyzeError'), (e as Error).message);
+          }
         }
       }
     } else {
@@ -872,7 +878,12 @@ export function DashboardScreen() {
           if (id) handleDelete(id);
         }}
       />
-      <Toast visible={voiceToast !== null} message={voiceToast ?? ''} tone="info" onDismiss={() => setVoiceToast(null)} />
+      <Toast
+        visible={voiceToast !== null}
+        message={voiceToast?.message ?? ''}
+        tone={voiceToast?.tone ?? 'info'}
+        onDismiss={() => setVoiceToast(null)}
+      />
       <Toast
         visible={budgetToast !== null}
         message={budgetToast ? `${budgetToast.title}: ${budgetToast.body}` : ''}

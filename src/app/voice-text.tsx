@@ -10,6 +10,7 @@ import { Fonts, Spacing } from '@/constants/theme';
 import { useSpeechTranscript } from '@/hooks/use-speech-transcript';
 import { useAnalyzeAudio } from '@/hooks/use-analyze-audio';
 import { useTranslation } from '@/i18n/useTranslation';
+import { isServiceUnavailable } from '@/services/expense-api';
 import { setVoiceTranscript } from '@/services/voice-draft';
 import { flagForRegion } from '@/services/voice-locale';
 import { getAllCategories, resolveCategoryId } from '@/expenses/categories/expenseCategories';
@@ -94,7 +95,8 @@ export default function VoiceTextScreen() {
       dispatch(setPendingQueue(queue));
       router.back();
     } catch (e) {
-      setSendError((e as Error).message ?? t('voicetext_error'));
+      // Servicio saturado (503/alta demanda): mensaje amable en vez del error crudo.
+      setSendError(isServiceUnavailable(e) ? t('common_serviceUnavailable') : ((e as Error).message ?? t('voicetext_error')));
     }
   };
 

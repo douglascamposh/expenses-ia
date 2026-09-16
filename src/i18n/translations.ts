@@ -14,6 +14,7 @@ const es = {
   common_add: 'Añadir',
 
   common_unexpected: 'Error inesperado',
+  common_serviceUnavailable: 'El servicio no está disponible ahora. Reintenta más tarde.',
 
   dashboard_searchPlaceholder: 'Buscar gastos...',
   dashboard_searchPh: 'Buscar',
@@ -280,10 +281,10 @@ const es = {
   budgetModal_delete: 'Eliminar',
   budgetModal_cancel: 'Cancelar',
   budgetModal_save: 'Guardar',
-  budgetModal_deleteTitle: 'Delete budget?',
-  budgetModal_deleteDesc: 'This budget will be removed.',
-  budgetModal_deleteConfirm: 'Delete',
-  budgetModal_deleteCancel: 'Cancel',
+  budgetModal_deleteTitle: '¿Eliminar presupuesto?',
+  budgetModal_deleteDesc: 'Este presupuesto se eliminará. Esta acción no se puede deshacer.',
+  budgetModal_deleteConfirm: 'Eliminar',
+  budgetModal_deleteCancel: 'Cancelar',
   budgetModal_a11yBack: 'Volver',
   budgetModal_a11yCategory: 'Cambiar categoría',
   budgetModal_a11yCurrency: 'Cambiar moneda',
@@ -324,10 +325,14 @@ const es = {
   offline_title: 'Sin conexión a internet.',
   offline_subtitle: 'Tus gastos guardados siguen disponibles.',
 
-  deleteConfirm_title: 'Delete expense?',
-  deleteConfirm_desc: 'This expense will be removed.',
-  deleteConfirm_delete: 'Delete',
-  deleteConfirm_cancel: 'Cancel',
+  deleteConfirm_title: '¿Eliminar?',
+  deleteConfirm_desc: 'Esta acción no se puede deshacer.',
+  deleteConfirm_delete: 'Eliminar',
+  deleteConfirm_cancel: 'Cancelar',
+  deleteConfirm_categoryTitle: '¿Eliminar categoría?',
+  deleteConfirm_categoryDesc: 'Se eliminará "{label}". Esta acción no se puede deshacer.',
+  deleteConfirm_recurringTitle: '¿Eliminar regla?',
+  deleteConfirm_recurringDesc: 'Se eliminará "{label}". Esta acción no se puede deshacer.',
 
   empty_title: 'No expenses yet',
   empty_subtitle: 'Start tracking your spending easily.',
@@ -401,6 +406,7 @@ const en: Strings = {
   common_add: 'Add',
 
   common_unexpected: 'Unexpected error',
+  common_serviceUnavailable: 'The service is not available right now. Please try again later.',
 
   dashboard_searchPlaceholder: 'Search expenses...',
   dashboard_searchPh: 'Search',
@@ -711,10 +717,14 @@ const en: Strings = {
   offline_title: 'No internet connection.',
   offline_subtitle: 'Your saved expenses are still available.',
 
-  deleteConfirm_title: 'Delete expense?',
-  deleteConfirm_desc: 'This expense will be removed.',
+  deleteConfirm_title: 'Delete?',
+  deleteConfirm_desc: 'This action cannot be undone.',
   deleteConfirm_delete: 'Delete',
   deleteConfirm_cancel: 'Cancel',
+  deleteConfirm_categoryTitle: 'Delete category?',
+  deleteConfirm_categoryDesc: '"{label}" will be removed. This action cannot be undone.',
+  deleteConfirm_recurringTitle: 'Delete rule?',
+  deleteConfirm_recurringDesc: '"{label}" will be removed. This action cannot be undone.',
 
   empty_title: 'No expenses yet',
   empty_subtitle: 'Start tracking your spending easily.',

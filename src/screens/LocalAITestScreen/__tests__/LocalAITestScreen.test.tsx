@@ -1,6 +1,14 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import { LocalAITestScreen } from '../index';
+import { useAnalyzeAudio } from '@/hooks/use-analyze-audio';
+
+jest.mock('@/hooks/use-analyze-audio', () => {
+  const actual = jest.requireActual('@/hooks/use-analyze-audio');
+  return { ...actual, useAnalyzeAudio: jest.fn(actual.useAnalyzeAudio) };
+});
+
+const mockAnalyzeAudio = useAnalyzeAudio as jest.Mock;
 
 describe('LocalAITestScreen', () => {
   it('renders title Local AI Test', () => {
@@ -64,5 +72,20 @@ describe('LocalAITestScreen', () => {
   it('shows offline-first hint', () => {
     const { getByText } = render(<LocalAITestScreen />);
     expect(getByText(/Local-first \/ Offline-first POC/)).toBeTruthy();
+  });
+
+  it('503 de alta demanda: muestra mensaje amable localizado y no el error crudo', () => {
+    mockAnalyzeAudio.mockReturnValueOnce({
+      status: 'error',
+      expenses: null,
+      error: 'Error 503: this model is currently experiencing high demand, status: unavailable',
+      isLoading: false,
+      analyze: jest.fn(),
+      analyzeText: jest.fn(),
+      reset: jest.fn(),
+    });
+    const { getByText, queryByText } = render(<LocalAITestScreen />);
+    expect(getByText('El servicio no está disponible ahora. Reintenta más tarde.')).toBeTruthy();
+    expect(queryByText(/high demand/)).toBeNull();
   });
 });

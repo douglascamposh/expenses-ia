@@ -92,7 +92,13 @@ export function UnifiedVoiceModal({ visible, phase, expenses, onStop, onClose, o
               <Button variant="neutral" size="sm" style={{ alignSelf: 'center' }} onPress={onCancelAnalyzing}>{t('voice_cancel')}</Button>
             </View>
           ) : (
-            <Pressable onPress={onStop} style={({ pressed }) => [[styles.stopBtn, { backgroundColor: theme.backgroundElement, borderColor: theme.primary }], pressed && { opacity: 0.85 }]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('recording_stop')}
+              testID="voice-stop-button"
+              onPress={onStop}
+              style={({ pressed }) => [[styles.stopBtn, { backgroundColor: theme.backgroundElement, borderColor: theme.primary }], pressed && { opacity: 0.85 }]}
+            >
               <Square size={12} color={theme.primary} fill={theme.primary} />
               <Text variant="smallBold" style={[styles.stopText, { color: theme.primary }]}>{t('voice_stop')}</Text>
             </Pressable>

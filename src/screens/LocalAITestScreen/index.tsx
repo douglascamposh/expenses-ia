@@ -7,6 +7,9 @@ import { Spacing } from '@/constants/theme';
 import { useAudioRecording } from '@/hooks/use-audio-recording';
 import { useAnalyzeAudio } from '@/hooks/use-analyze-audio';
 
+import { useTranslation } from '@/i18n/useTranslation';
+import { isServiceUnavailable } from '@/services/expense-api';
+
 type PipelineStep = {
   label: string;
   status: string;
@@ -34,6 +37,7 @@ function formatDurationSeconds(ms: number): string {
 }
 
 export function LocalAITestScreen() {
+  const { t } = useTranslation();
   const {
     state,
     errorMessage,
@@ -178,21 +182,25 @@ export function LocalAITestScreen() {
                   )}
                 </View>
               )}
-              {analyzeStatus === 'error' && analyzeError && (
+              {analyzeStatus === 'error' && analyzeError && (() => {
+                // Servicio saturado (503/alta demanda): mensaje amable en vez del error crudo.
+                const unavailable = isServiceUnavailable({ message: analyzeError });
+                return (
                 <View style={styles.errorBox}>
                   <ThemedText type="small" style={styles.errorText}>
-                    {analyzeError}
+                    {unavailable ? t('common_serviceUnavailable') : analyzeError}
                   </ThemedText>
                   <Pressable
                     onPress={() => result && void analyze(result.filePath)}
                     style={({ pressed }) => [styles.tryAgainButton, pressed && styles.pressed]}
                   >
                     <ThemedText type="smallBold" style={styles.tryAgainText}>
-                      Reintentar
+                      {unavailable ? t('common_retry') : 'Reintentar'}
                     </ThemedText>
                   </Pressable>
                 </View>
-              )}
+                );
+              })()}
               {analyzeStatus !== 'loading' && (
                 <Pressable
                   onPress={resetAnalyze}

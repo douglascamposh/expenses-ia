@@ -172,8 +172,9 @@ describe('CategoriesScreen (categorías del usuario)', () => {
       fireEvent.press(getByLabelText('Guardar'));
       await waitFor(() => expect(getByText('Mascotas')).toBeTruthy());
       fireEvent.press(getByLabelText('Eliminar Mascotas'));
-      await waitFor(() => expect(getByText('Delete expense?')).toBeTruthy());
-      fireEvent.press(getByText('Delete'));
+      await waitFor(() => expect(getByText('¿Eliminar categoría?')).toBeTruthy());
+      expect(getByText('Se eliminará "Mascotas". Esta acción no se puede deshacer.')).toBeTruthy();
+      fireEvent.press(getByText('Eliminar'));
       const { categoryRepository } = jest.requireMock('@/expenses/repositories/CategoryRepository') as {
         categoryRepository: { delete: jest.Mock };
       };

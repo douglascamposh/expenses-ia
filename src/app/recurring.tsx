@@ -48,6 +48,9 @@ export default function RecurringScreen() {
     [rules, filter],
   );
 
+  /** Regla pendiente de borrado: da el nombre para el texto de confirmación. */
+  const deleting = (rules ?? []).find((r) => r && r.id === deleteId) ?? null;
+
   const nextDateOf = (ruleId: string): string | null => {
     const rule = (rules ?? []).find((r) => r && r.id === ruleId);
     if (!rule || !rule.active) return null;
@@ -189,7 +192,13 @@ export default function RecurringScreen() {
         )}
       </ScrollView>
 
-      <DeleteConfirm visible={deleteId !== null} onCancel={() => setDeleteId(null)} onDelete={confirmDelete} />
+      <DeleteConfirm
+        visible={deleteId !== null}
+        title={t('deleteConfirm_recurringTitle')}
+        description={deleting ? t('deleteConfirm_recurringDesc', { label: deleting.description }) : undefined}
+        onCancel={() => setDeleteId(null)}
+        onDelete={confirmDelete}
+      />
     </ThemedView>
   );
 }

@@ -66,6 +66,39 @@ export class AnalyzeError extends Error {
 }
 
 /**
+ * HTTP que indican que el servicio de IA no está disponible *ahora*:
+ * 503 por alta demanda, 502/504 de la plataforma, 429 rate limit, etc.
+ */
+const UNAVAILABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+/**
+ * Fragmentos que aparecen en el cuerpo del backend cuando el modelo está
+ * saturado (p. ej. "this model is currently experiencing high demand").
+ */
+const UNAVAILABLE_HINTS = [
+  'high demand',
+  'unavailable',
+  'overloaded',
+  'over capacity',
+  'try again later',
+  'temporarily',
+  'resource exhausted',
+];
+
+/**
+ * True cuando el fallo es del servicio (no del request del usuario).
+ * Las pantallas lo usan para mostrar un mensaje amable en vez del error
+ * crudo del backend.
+ */
+export function isServiceUnavailable(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const status = (error as { status?: unknown }).status;
+  if (typeof status === 'number' && UNAVAILABLE_STATUSES.has(status)) return true;
+  const message = String((error as { message?: unknown }).message ?? '').toLowerCase();
+  return UNAVAILABLE_HINTS.some((hint) => message.includes(hint));
+}
+
+/**
  * Envía audio local a la API y retorna gastos estructurados.
  * @param localAudioUri - filePath/uri del AudioRecordingResult (file://...)
  * @param model - modelo a usar, por defecto 'gemini'
