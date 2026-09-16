@@ -106,14 +106,42 @@ jest.mock('react-native-safe-area-context', () => {
   };
 });
 
-// react-native-reanimated mock — required for jest without worklets runtime
-try {
-  require('react-native-reanimated').setUpTests = () => {};
-} catch {}
+// react-native-reanimated mock liviano (el mock oficial crashea sin runtime worklets)
 jest.mock('react-native-reanimated', () => {
-  const actual = jest.requireActual('react-native-reanimated/mock');
+  const React = require('react');
+  const { View, Text, ScrollView } = require('react-native');
+  const strip = ({ entering, exiting, layout, ...rest }) => rest;
+  const mockComp = (Comp) =>
+    React.forwardRef((props, ref) => React.createElement(Comp, { ...strip(props), ref }));
+  const chain = {};
+  chain.duration = () => chain;
+  chain.delay = () => chain;
+  chain.springify = () => chain;
+  chain.damping = () => chain;
+  chain.stiffness = () => chain;
+  chain.easing = () => chain;
+  chain.withCallback = () => chain;
+  const AnimatedMock = {
+    View: mockComp(View),
+    Text: mockComp(Text),
+    ScrollView: mockComp(ScrollView),
+    createAnimatedComponent: (Comp) => mockComp(Comp),
+  };
   return {
-    ...actual,
+    __esModule: true,
+    default: AnimatedMock,
+    ...AnimatedMock,
+    FadeIn: chain,
+    FadeInUp: chain,
+    FadeOut: chain,
+    Layout: { springify: () => ({}) },
+    Easing: { linear: (t) => t, ease: (t) => t },
+    useSharedValue: (v) => ({ value: v }),
+    useAnimatedStyle: (fn) => fn(),
+    useDerivedValue: (fn) => ({ value: fn() }),
+    useAnimatedReaction: () => {},
+    runOnJS: (fn) => fn,
+    useReducedMotion: () => false,
   };
 });
 

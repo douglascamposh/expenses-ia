@@ -9,6 +9,9 @@ import * as FileSystem from 'expo-file-system/legacy';
 export const ANALYZE_ENDPOINT =
   'https://expense-audio-analyzer-571414320359.us-east1.run.app/api/analyze';
 
+export const ANALYZE_TEXT_ENDPOINT =
+  'https://expense-audio-analyzer-571414320359.us-east1.run.app/api/analyze-text';
+
 export const EMBED_ENDPOINT =
   'https://expense-audio-analyzer-571414320359.us-east1.run.app/api/embed';
 
@@ -161,6 +164,15 @@ export async function analyzeAudio(
   }
 
   // Normalizar: priorizar data.actions → CREATE_EXPENSE (formato correcto del ejemplo)
+  const expenses = normalizeAnalyzeResponse(json);
+
+  console.log('Gastos detectados:', expenses);
+  const latency = !Array.isArray(json) ? (json as AnalyzeResponse).latency : undefined;
+  return { expenses, raw: json, latency };
+}
+
+/** Normaliza cualquier forma de respuesta del backend a lista de gastos. */
+export function normalizeAnalyzeResponse(json: AnalyzeResponse | Expense[]): Expense[] {
   let expenses: Expense[] = [];
   if (!Array.isArray(json) && Array.isArray((json as AnalyzeResponse).actions)) {
     const actions = (json as AnalyzeResponse).actions as { action: string; expense?: Expense }[];
@@ -181,8 +193,71 @@ export async function analyzeAudio(
     const maybeExpenses = (json as Record<string, unknown>).expenses;
     if (Array.isArray(maybeExpenses)) expenses = maybeExpenses as Expense[];
   }
+  return expenses;
+}
 
-  console.log('Gastos detectados:', expenses);
+export type AnalyzeTextInput = {
+  text: string;
+  categories?: { id: string; label: string; kind: string }[] | string[];
+  model?: string;
+  currentDate?: string;
+};
+
+/**
+ * Envía texto transcrito a la API y retorna gastos estructurados.
+ * Mismo contrato de respuesta que analyzeAudio (actions CREATE_EXPENSE).
+ * Request: POST JSON { text, categories, model, currentDate }.
+ */
+export async function analyzeText(
+  text: string,
+  model: string = 'gemini',
+  categories?: { id: string; label: string; kind: string }[] | string[],
+  currentDate?: string,
+): Promise<AnalyzeResult> {
+  const clean = typeof text === 'string' ? text.trim() : '';
+  if (clean.length === 0) {
+    throw new AnalyzeError('Texto vacío para analizar');
+  }
+  const body: AnalyzeTextInput = {
+    text: clean,
+    categories: categories ?? [],
+    model,
+    currentDate: currentDate ?? new Date().toISOString().split('T')[0],
+  };
+
+  let response: Response;
+  try {
+    response = await fetch(ANALYZE_TEXT_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    throw new AnalyzeError((e as Error).message ?? 'Error de red al analizar texto');
+  }
+
+  let json: AnalyzeResponse | Expense[] = {} as AnalyzeResponse;
+  try {
+    json = (await response.json()) as AnalyzeResponse | Expense[];
+  } catch {
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new AnalyzeError(`Error ${response.status}: ${text || response.statusText}`.trim(), response.status);
+    }
+    throw new AnalyzeError('Respuesta inválida del servidor');
+  }
+
+  if (!response.ok) {
+    const errMsg = (json as AnalyzeResponse)?.error as string | undefined;
+    throw new AnalyzeError((errMsg as string) || `Error ${response.status} procesando el texto`, response.status);
+  }
+
+  if (!Array.isArray(json) && typeof (json as AnalyzeResponse).latency === 'number') {
+    console.log('✅ Análisis de texto exitoso. Latencia:', (json as AnalyzeResponse).latency, 'ms');
+  }
+
+  const expenses = normalizeAnalyzeResponse(json);
+  console.log('Gastos detectados (texto):', expenses);
   const latency = !Array.isArray(json) ? (json as AnalyzeResponse).latency : undefined;
   return { expenses, raw: json, latency };
 }
