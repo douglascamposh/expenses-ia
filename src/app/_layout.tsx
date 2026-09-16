@@ -3,6 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 // TODO(PUSH-TEMP): push desactivada temporalmente — descomentar para reactivar.
 // import * as Notifications from 'expo-notifications';
 // import { useEffect } from 'react';
+import { useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -10,11 +11,17 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { store } from '@/store';
+import { ensureSignedIn } from '@/services/auth';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  // Sesión Firebase anónima temprana: deja el ID token listo para /api/*.
+  // Silencioso: si falla, cada llamada reintenta lazy vía ensureSignedIn().
+  useEffect(() => {
+    ensureSignedIn().catch(() => {});
+  }, []);
   // TODO(PUSH-TEMP): push desactivada temporalmente — descomentar para reactivar.
   // useEffect(() => {
   //   try {

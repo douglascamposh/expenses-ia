@@ -185,3 +185,14 @@ jest.mock('expo-localization', () => ({
   getLocales: jest.fn(() => [{ languageCode: 'es', languageTag: 'es-BO' }]),
 }));
 
+
+jest.mock('@react-native-firebase/auth', () => {
+  const api = {
+    getAuth: jest.fn(() => ({ currentUser: { uid: 'test-uid' } })),
+    signInAnonymously: jest.fn(() =>
+      Promise.resolve({ user: { uid: 'test-anon-uid' } }),
+    ),
+    getIdToken: jest.fn(() => Promise.resolve('test-id-token')),
+  };
+  return { ...api, __api: api };
+});

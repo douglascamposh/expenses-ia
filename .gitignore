@@ -44,3 +44,7 @@ example
 # generated native folders
 /ios
 /android
+
+# Firebase nativo (descargar de console.firebase.google.com, no commitear)
+google-services.json
+GoogleService-Info.plist

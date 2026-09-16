@@ -1,5 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 
+import { getAuthToken } from './auth';
+
 /**
  * Expense API — envía audio a endpoint cloud y recibe gastos estructurados.
  * Basado en ejemplo del usuario: FormData { audio: {uri,name,type}, model: 'gemini', currentDate }
@@ -99,6 +101,23 @@ export function isServiceUnavailable(error: unknown): boolean {
 }
 
 /**
+ * fetch con `Authorization: Bearer <Firebase ID token>`.
+ * El backend valida el token con Admin SDK y ata la cuota al UID.
+ * Ante un 401 reintenta una sola vez con token forzadamente fresco.
+ */
+async function fetchWithAuth(url: string, init: RequestInit): Promise<Response> {
+  const call = async (forceRefresh: boolean): Promise<Response> => {
+    const token = await getAuthToken(forceRefresh);
+    const headers = { ...(init.headers as Record<string, string> | undefined) };
+    headers.Authorization = `Bearer ${token}`;
+    return fetch(url, { ...init, headers });
+  };
+  const first = await call(false);
+  if (first.status === 401) return call(true);
+  return first;
+}
+
+/**
  * Envía audio local a la API y retorna gastos estructurados.
  * @param localAudioUri - filePath/uri del AudioRecordingResult (file://...)
  * @param model - modelo a usar, por defecto 'gemini'
@@ -163,7 +182,7 @@ export async function analyzeAudio(
   let response: Response;
   try {
     console.log('Enviando audio al servidor...');
-    response = await fetch(ANALYZE_ENDPOINT, {
+    response = await fetchWithAuth(ANALYZE_ENDPOINT, {
       method: 'POST',
       body: formData,
       headers: {
@@ -260,7 +279,7 @@ export async function analyzeText(
 
   let response: Response;
   try {
-    response = await fetch(ANALYZE_TEXT_ENDPOINT, {
+    response = await fetchWithAuth(ANALYZE_TEXT_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(body),
@@ -306,7 +325,7 @@ export async function embedText(text: string, endpoint: string = EMBED_ENDPOINT)
   }
   let response: Response;
   try {
-    response = await fetch(endpoint, {
+    response = await fetchWithAuth(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ text }),
