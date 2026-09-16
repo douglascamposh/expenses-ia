@@ -118,12 +118,13 @@ jest.mock('react-native-reanimated', () => {
 });
 
 
-jest.mock('expo-notifications', () => ({
-  getPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
-  requestPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
-  scheduleNotificationAsync: jest.fn(() => Promise.resolve('test-id')),
-  setNotificationHandler: jest.fn(),
-}));
+// TODO(PUSH-TEMP): mock desactivado temporalmente — expo-notifications desinstalado.
+// jest.mock('expo-notifications', () => ({
+//   getPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
+//   requestPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
+//   scheduleNotificationAsync: jest.fn(() => Promise.resolve('test-id')),
+//   setNotificationHandler: jest.fn(),
+// }));
 
 jest.mock('expo-speech-recognition', () => {
   const listeners = {};
