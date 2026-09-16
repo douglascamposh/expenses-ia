@@ -36,6 +36,9 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# IDEs - IntelliJ IDEA
+.idea/
+
 example
 
 # generated native folders
