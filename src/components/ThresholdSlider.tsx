@@ -29,13 +29,6 @@ export function ThresholdSlider({ value, onCommit, onSlidingChange }: Props) {
 
   const commitRef = useRef(onCommit);
   commitRef.current = onCommit;
-  const localRef = useRef(local);
-  localRef.current = local;
-  const apply = (x: number) => {
-    const v = xToValue(x);
-    localRef.current = v;
-    setLocal(v);
-  };
 
   const valueToX = (v: number) => (trackW <= 0 ? 0 : ((v - THRESHOLD_MIN) / (THRESHOLD_MAX - THRESHOLD_MIN)) * trackW);
   const xToValue = (x: number) => {
@@ -44,28 +37,28 @@ export function ThresholdSlider({ value, onCommit, onSlidingChange }: Props) {
     return Math.round((THRESHOLD_MIN + pct * (THRESHOLD_MAX - THRESHOLD_MIN)) / THRESHOLD_STEP) * THRESHOLD_STEP;
   };
 
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      // Solo gestos horizontales: el scroll vertical del padre no compite.
-      onMoveShouldSetPanResponder: (_e, gs) => Math.abs(gs.dx) > Math.abs(gs.dy) * 1.5,
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: (e) => {
-        onSlidingChange?.(true);
-        apply(e.nativeEvent.locationX);
-      },
-      onPanResponderMove: (e) => {
-        apply(e.nativeEvent.locationX);
-      },
-      onPanResponderRelease: () => {
-        onSlidingChange?.(false);
-        commitRef.current(localRef.current);
-      },
-      onPanResponderTerminate: () => {
-        onSlidingChange?.(false);
-      },
-    }),
-  ).current;
+  // Se crea en cada render a propósito: así los handlers siempre ven
+  // trackW/local frescos (con useRef quedaban congelados en 0 y no se movía).
+  const pan = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    // Solo gestos horizontales: el scroll vertical del padre no compite.
+    onMoveShouldSetPanResponder: (_e, gs) => Math.abs(gs.dx) > Math.abs(gs.dy) * 1.5,
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderGrant: (e) => {
+      onSlidingChange?.(true);
+      setLocal(xToValue(e.nativeEvent.locationX));
+    },
+    onPanResponderMove: (e) => {
+      setLocal(xToValue(e.nativeEvent.locationX));
+    },
+    onPanResponderRelease: () => {
+      onSlidingChange?.(false);
+      commitRef.current(local);
+    },
+    onPanResponderTerminate: () => {
+      onSlidingChange?.(false);
+    },
+  });
 
   return (
     <View

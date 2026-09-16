@@ -638,7 +638,7 @@ export function DashboardScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={t('dashboard_a11yVoiceRecord')}
-                    onPress={handleVoicePress}
+                    onPress={() => router.push('/voice-text' as never)}
                     style={styles.suggestMic}
                   >
                     <Mic size={20} color="#FFFFFF" />
@@ -760,7 +760,7 @@ export function DashboardScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={audio.isRecording ? t('dashboard_a11yStopRecord') : t('dashboard_a11yVoiceRecord')}
-          onPress={handleVoicePress}
+          onPress={() => router.push('/voice-text' as never)}
           disabled={analyzer.isLoading || audio.state === 'processing'}
           style={[styles.fabMic, { bottom: 16 + androidLift }]}
         >

@@ -125,6 +125,33 @@ jest.mock('expo-notifications', () => ({
   setNotificationHandler: jest.fn(),
 }));
 
+jest.mock('expo-speech-recognition', () => {
+  const listeners = {};
+  const api = {
+    start: jest.fn(),
+    stop: jest.fn(),
+    abort: jest.fn(),
+    requestPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
+    isRecognitionAvailable: jest.fn(() => true),
+    getSupportedLocales: jest.fn(() =>
+      Promise.resolve({ locales: ['es-MX', 'en-US'], installedLocales: ['es-MX'] }),
+    ),
+    supportsOnDeviceRecognition: jest.fn(() => true),
+    addListener: jest.fn((event, cb) => {
+      listeners[event] = cb;
+      return { remove: jest.fn() };
+    }),
+  };
+  return {
+    ExpoSpeechRecognitionModule: api,
+    useSpeechRecognitionEvent: jest.fn((event, cb) => {
+      listeners[event] = cb;
+    }),
+    __listeners: listeners,
+    __api: api,
+  };
+});
+
 jest.mock('expo-localization', () => ({
   getLocales: jest.fn(() => [{ languageCode: 'es', languageTag: 'es-BO' }]),
 }));

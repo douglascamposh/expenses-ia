@@ -51,7 +51,8 @@
       ],
       "expo-asset",
       "expo-sqlite",
-      "expo-localization"
+      "expo-localization",
+      "expo-speech-recognition"
     ],
     "experiments": {
       "typedRoutes": true,
