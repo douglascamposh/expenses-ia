@@ -39,6 +39,7 @@ export default function RootLayout() {
             <Stack.Screen name="settings" />
             <Stack.Screen name="budgets" />
             <Stack.Screen name="categories" />
+            <Stack.Screen name="voice-text" />
             <Stack.Screen name="diagnostics" />
           </Stack>
         </ThemeProvider>
