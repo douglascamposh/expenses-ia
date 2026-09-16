@@ -6,6 +6,7 @@ import type { Swipeable } from 'react-native-gesture-handler';
 import { ThemedView } from '@/components/themed-view';
 import { CategoryRow } from '@/components/CategoryRow';
 import { DeleteConfirm } from '@/components/DeleteConfirm';
+import { Toast } from '@/components/Toast';
 import { Button, Text } from '@/components/ui';
 import { CreateCategoryModal } from '@/components/CreateCategoryModal';
 import { Spacing, Fonts } from '@/constants/theme';
@@ -16,6 +17,7 @@ import {
 } from '@/expenses/categories/expenseCategories';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { createCategory, deleteCategory, fetchCategories } from '@/store/categoriesSlice';
+import { expenseRepository } from '@/expenses/repositories/ExpenseRepository';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -31,6 +33,7 @@ export default function CategoriesScreen() {
   const [createVisible, setCreateVisible] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [blockedToast, setBlockedToast] = useState<string | null>(null);
   const suggestions = useMemo(() => getSuggestions(), [custom]);
   const editing = (custom ?? []).find((c) => String(c.id) === String(editingId)) ?? null;
   /** Filas swipe abiertas: solo una a la vez. */
@@ -48,6 +51,23 @@ export default function CategoriesScreen() {
   useEffect(() => {
     if (categoriesError) Alert.alert(t('categories_listAlert'), categoriesError);
   }, [categoriesError, t]);
+
+  /** Swipe → papelera: si hay items usándola se bloquea con toast. */
+  const requestDelete = useCallback((id: string) => {
+    void (async () => {
+      let used = 0;
+      try {
+        used = await expenseRepository.countByCategory(id);
+      } catch {
+        used = 0;
+      }
+      if (used > 0) {
+        setBlockedToast(t('categories_deleteBlocked', { n: used }));
+        return;
+      }
+      setDeleteId(id);
+    })();
+  }, [t]);
 
   const confirmDelete = () => {
     if (!deleteId) return;
@@ -99,7 +119,7 @@ export default function CategoriesScreen() {
                 key={String(c.id)}
                 item={{ id: String(c.id), label: c.label, emoji: c.emoji, color: c.color, kind: c.kind }}
                 onEdit={() => setEditingId(String(c.id))}
-                onTrashPress={(id) => setDeleteId(id)}
+                onTrashPress={requestDelete}
                 swipeRefs={swipeRefs}
                 onOpen={closeOtherRows}
               />
@@ -160,6 +180,7 @@ export default function CategoriesScreen() {
         onSaved={() => setEditingId(null)}
       />
       <DeleteConfirm visible={deleteId !== null} onCancel={() => setDeleteId(null)} onDelete={confirmDelete} />
+      <Toast visible={blockedToast !== null} message={blockedToast ?? ''} tone="error" onDismiss={() => setBlockedToast(null)} />
     </ThemedView>
   );
 }

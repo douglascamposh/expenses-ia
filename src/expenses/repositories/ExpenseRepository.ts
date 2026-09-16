@@ -14,6 +14,8 @@ export interface ExpenseRepository {
   getMonthlyTotals(from: string, to: string): Promise<{ month: string; currency: string; total: number }[]>;
   /** Fecha ISO del gasto más antiguo (para acotar el selector de año). */
   getOldestDate(): Promise<string | null>;
+  /** Cuántos gastos/ingresos usan una categoría (bloquea su borrado). */
+  countByCategory(category: string): Promise<number>;
   delete(id: string): Promise<void>;
   update(id: string, patch: Partial<Omit<Expense, 'id' | 'createdAt'>>): Promise<Expense | null>;
   clearAll(): Promise<void>;
@@ -121,6 +123,14 @@ export class SqliteExpenseRepository implements ExpenseRepository {
     return row?.d ?? null;
   }
 
+  async countByCategory(category: string): Promise<number> {
+    const db = await getDatabase();
+    const row = await db
+      .getFirstAsync<{ n: number | null }>('SELECT COUNT(*) as n FROM expenses WHERE category = ?', [category])
+      .catch(() => null);
+    return row?.n ?? 0;
+  }
+
   async delete(id: string): Promise<void> {
     const db = await getDatabase();
     await db.runAsync('DELETE FROM expenses WHERE id = ?', [id]);
@@ -214,6 +224,10 @@ export class InMemoryExpenseRepository implements ExpenseRepository {
       if (min === null || e.date < min) min = e.date;
     }
     return min;
+  }
+  async countByCategory(category: string): Promise<number> {
+    const all = await this.getAll();
+    return all.filter((e) => e && String(e.category) === String(category)).length;
   }
   async delete(id: string): Promise<void> {
     this.store.delete(id);

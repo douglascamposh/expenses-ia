@@ -40,6 +40,7 @@ jest.mock('@/expenses/repositories/ExpenseRepository', () => ({
     getCategorySummary: jest.fn(() => Promise.resolve([{ category: 'FOOD', currency: 'BOB', total: 600 }])),
     getMonthlyTotals: jest.fn(() => Promise.resolve([])),
     getOldestDate: jest.fn(() => Promise.resolve(null)),
+    countByCategory: jest.fn(() => Promise.resolve(0)),
     create: jest.fn((e) => Promise.resolve(e)),
   },
 }));

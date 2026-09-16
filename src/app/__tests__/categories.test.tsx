@@ -9,6 +9,15 @@ import settingsReducer from '@/store/settingsSlice';
 type Custom = { id: string; label: string; emoji: string; color: string; kind?: string };
 let mockCustomStore: Record<string, Custom> = {};
 
+const mockCountByCategory: { current: (id: string) => Promise<number> } = {
+  current: async () => 0,
+};
+jest.mock('@/expenses/repositories/ExpenseRepository', () => ({
+  expenseRepository: {
+    getAll: jest.fn(() => Promise.resolve([])),
+    countByCategory: jest.fn((id: string) => mockCountByCategory.current(id)),
+  },
+}));
 jest.mock('@/expenses/repositories/CategoryRepository', () => ({
   categoryRepository: {
     getCustom: jest.fn(() => Promise.resolve(Object.values(mockCustomStore))),
@@ -130,5 +139,48 @@ describe('CategoriesScreen (categorías del usuario)', () => {
     expect(getByLabelText('Icono 🍔')).toBeTruthy();
     expect(getByLabelText('Icono 🧺')).toBeTruthy();
     expect(queryByLabelText('Ver más iconos')).toBeNull();
+  });
+
+  it('borrar categoría en uso se bloquea con toast', async () => {
+    mockCountByCategory.current = async () => 2;
+    try {
+      const { getByText, getByLabelText, getByPlaceholderText, queryByText } = renderWithStore();
+      await waitFor(() => expect(getByText('Añadir categoría nueva')).toBeTruthy());
+      fireEvent.press(getByText('+ Nueva categoría'));
+      await waitFor(() => expect(getByText('Nueva categoría')).toBeTruthy());
+      fireEvent.changeText(getByPlaceholderText('Mascotas'), 'Mascotas');
+      fireEvent.press(getByLabelText('Guardar'));
+      await waitFor(() => expect(getByText('Mascotas')).toBeTruthy());
+      fireEvent.press(getByLabelText('Eliminar Mascotas'));
+      await new Promise((r) => setTimeout(r, 500));
+      await waitFor(() => expect(getByText('Hay 2 items usando esta categoría')).toBeTruthy());
+      // Sin confirmación de borrado
+      expect(queryByText('¿Eliminar?')).toBeNull();
+    } finally {
+      mockCountByCategory.current = async () => 0;
+    }
+  });
+
+  it('borrar categoría sin uso pide confirmación y elimina', async () => {
+    mockCountByCategory.current = async () => 0;
+    try {
+      const { getByText, getByLabelText, getByPlaceholderText, queryByText } = renderWithStore();
+      await waitFor(() => expect(getByText('Añadir categoría nueva')).toBeTruthy());
+      fireEvent.press(getByText('+ Nueva categoría'));
+      await waitFor(() => expect(getByText('Nueva categoría')).toBeTruthy());
+      fireEvent.changeText(getByPlaceholderText('Mascotas'), 'Mascotas');
+      fireEvent.press(getByLabelText('Guardar'));
+      await waitFor(() => expect(getByText('Mascotas')).toBeTruthy());
+      fireEvent.press(getByLabelText('Eliminar Mascotas'));
+      await waitFor(() => expect(getByText('Delete expense?')).toBeTruthy());
+      fireEvent.press(getByText('Delete'));
+      const { categoryRepository } = jest.requireMock('@/expenses/repositories/CategoryRepository') as {
+        categoryRepository: { delete: jest.Mock };
+      };
+      await waitFor(() => expect(categoryRepository.delete).toHaveBeenCalledWith('MASCOTAS'));
+      await waitFor(() => expect(queryByText('Mascotas')).toBeNull());
+    } finally {
+      mockCountByCategory.current = async () => 0;
+    }
   });
 });

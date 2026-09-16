@@ -1,6 +1,6 @@
 import { fireEvent, render } from '@testing-library/react-native';
 import { UnifiedVoiceModal } from '../UnifiedVoiceModal';
-import { ExpenseCategory } from '@/expenses/categories/expenseCategories';
+import { ExpenseCategory, setCustomCategories } from '@/expenses/categories/expenseCategories';
 import type { NewExpense } from '@/expenses/models/Expense';
 
 const drafts: NewExpense[] = [
@@ -64,19 +64,28 @@ describe('UnifiedVoiceModal resultados (pantalla completa)', () => {
   });
 
   it('editor sin monedas: carrusel cambia categoría y fecha abre selector', () => {
-    const onSaveOne = jest.fn();
-    const { getAllByText, getByLabelText, queryByText } = renderResults({ onSaveOne });
-    fireEvent.press(getAllByText('Edit')[0]);
-    // Sin grilla de monedas (usa la del sistema)
-    expect(queryByText('USD')).toBeNull();
-    expect(queryByText('EUR')).toBeNull();
-    // Carrusel: cambiar a Transporte y guardar
-    fireEvent.press(getByLabelText('Transport'));
-    // Fecha abre el selector y elige un día
-    fireEvent.press(getByLabelText('Pick expense date'));
-    fireEvent.press(getByLabelText('Choose 2026-09-08'));
+    setCustomCategories([
+      { id: 'FOOD', label: 'Food', icon: 'x', emoji: '🍔', color: '#f97316', kind: 'GASTO' },
+      { id: 'TRANSPORT', label: 'Transport', icon: 'x', emoji: '🚗', color: '#3b82f6', kind: 'GASTO' },
+    ] as never);
+    try {
+      const onSaveOne = jest.fn();
+      const { getAllByText, getByLabelText, getByText, queryByText } = renderResults({ onSaveOne });
+      fireEvent.press(getAllByText('Edit')[0]);
+      // Sin grilla de monedas (usa la del sistema)
+      expect(queryByText('USD')).toBeNull();
+      expect(queryByText('EUR')).toBeNull();
+      // Carrusel: cambiar a Transporte y guardar
+      fireEvent.press(getByLabelText('Transport'));
+    // Fecha abre el selector, elige un día y acepta
+    fireEvent.press(getByLabelText('Elegir fecha del gasto'));
+    fireEvent.press(getByLabelText('Elegir 2026-09-08'));
+    fireEvent.press(getByText('Aceptar'));
     fireEvent.press(getAllByText('Save')[0]);
-    expect(onSaveOne).toHaveBeenCalledTimes(1);
-    expect(onSaveOne.mock.calls[0][1]).toMatchObject({ category: 'TRANSPORT', date: '2026-09-08' });
+      expect(onSaveOne).toHaveBeenCalledTimes(1);
+      expect(onSaveOne.mock.calls[0][1]).toMatchObject({ category: 'TRANSPORT', date: '2026-09-08' });
+    } finally {
+      setCustomCategories([]);
+    }
   });
 });

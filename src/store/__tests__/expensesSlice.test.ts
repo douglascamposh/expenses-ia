@@ -45,6 +45,7 @@ function bindMemory() {
   (expenseRepository as unknown as InMemoryExpenseRepository).clearAll = mem.clearAll.bind(mem);
   (expenseRepository as unknown as InMemoryExpenseRepository).getMonthlyTotals = mem.getMonthlyTotals.bind(mem);
   (expenseRepository as unknown as InMemoryExpenseRepository).getOldestDate = mem.getOldestDate.bind(mem);
+  (expenseRepository as unknown as InMemoryExpenseRepository).countByCategory = mem.countByCategory.bind(mem);
   (budgetRepository as unknown as InMemoryBudgetRepository).upsert = memBud.upsert.bind(memBud);
   (budgetRepository as unknown as InMemoryBudgetRepository).getAll = memBud.getAll.bind(memBud);
   (budgetRepository as unknown as InMemoryBudgetRepository).getProgress = memBud.getProgress.bind(memBud);
