@@ -18,7 +18,8 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { deleteBudget, fetchExpenses, upsertBudget } from '@/store/expensesSlice';
 import { fetchCategories } from '@/store/categoriesSlice';
 import { setBudgetAlertThreshold, setBudgetAlertsEnabled } from '@/store/settingsSlice';
-import { ensurePermissions } from '@/services/budget-alerts';
+// TODO(PUSH-TEMP): push desactivada temporalmente — descomentar para reactivar.
+// import { ensurePermissions } from '@/services/budget-alerts';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function BudgetsScreen() {
@@ -78,15 +79,16 @@ export default function BudgetsScreen() {
   }, [dispatch]);
 
   const handleToggleAlerts = useCallback(async (next: boolean) => {
-    if (next) {
-      const granted = await ensurePermissions();
-      if (!granted) {
-        Alert.alert(t('budgets_alertsTitle'), t('budgets_alertDenied'));
-        return;
-      }
-    }
+    // TODO(PUSH-TEMP): push desactivada temporalmente — se omite el permiso del sistema.
+    // if (next) {
+    //   const granted = await ensurePermissions();
+    //   if (!granted) {
+    //     Alert.alert(t('budgets_alertsTitle'), t('budgets_alertDenied'));
+    //     return;
+    //   }
+    // }
     void dispatch(setBudgetAlertsEnabled(next)).unwrap().catch(() => {});
-  }, [dispatch, t]);
+  }, [dispatch]);
 
   const handleThreshold = useCallback((n: number) => {
     void dispatch(setBudgetAlertThreshold(n)).unwrap().catch(() => {});

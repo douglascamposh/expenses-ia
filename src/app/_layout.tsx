@@ -1,7 +1,8 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import * as Notifications from 'expo-notifications';
-import { useEffect } from 'react';
+// TODO(PUSH-TEMP): push desactivada temporalmente — descomentar para reactivar.
+// import * as Notifications from 'expo-notifications';
+// import { useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -14,20 +15,21 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  useEffect(() => {
-    try {
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowBanner: true,
-          shouldShowList: true,
-          shouldPlaySound: false,
-          shouldSetBadge: false,
-        }),
-      });
-    } catch {
-      // Sin módulo nativo (Expo Go): las alertas usan fallback en-app.
-    }
-  }, []);
+  // TODO(PUSH-TEMP): push desactivada temporalmente — descomentar para reactivar.
+  // useEffect(() => {
+  //   try {
+  //     Notifications.setNotificationHandler({
+  //       handleNotification: async () => ({
+  //         shouldShowBanner: true,
+  //         shouldShowList: true,
+  //         shouldPlaySound: false,
+  //         shouldSetBadge: false,
+  //       }),
+  //     });
+  //   } catch {
+  //     // Sin módulo nativo (Expo Go): las alertas usan fallback en-app.
+  //   }
+  // }, []);
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
     <Provider store={store}>
