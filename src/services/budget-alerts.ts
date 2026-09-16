@@ -1,4 +1,5 @@
-import * as Notifications from 'expo-notifications';
+// TODO(PUSH-TEMP): push desactivada temporalmente — descomentar para reactivar.
+// import * as Notifications from 'expo-notifications';
 import { SETTING_KEYS, settingsRepository } from '@/expenses/repositories/SettingsRepository';
 import type { BudgetProgress } from '@/expenses/models/Budget';
 
@@ -47,23 +48,33 @@ export async function markNotified(key: string): Promise<void> {
 }
 
 /** Pide permiso de notificaciones (al activar las alertas). */
+// TODO(PUSH-TEMP): push desactivada temporalmente — descomentar para reactivar.
+// export async function ensurePermissions(): Promise<boolean> {
+//   try {
+//     const current = await Notifications.getPermissionsAsync();
+//     if (current.granted) return true;
+//     const req = await Notifications.requestPermissionsAsync();
+//     return req.granted;
+//   } catch {
+//     return false;
+//   }
+// }
 export async function ensurePermissions(): Promise<boolean> {
-  try {
-    const current = await Notifications.getPermissionsAsync();
-    if (current.granted) return true;
-    const req = await Notifications.requestPermissionsAsync();
-    return req.granted;
-  } catch {
-    return false;
-  }
+  // TEMP: sin push nativa, no se pide permiso del sistema.
+  return false;
 }
 
 /** Notificación local inmediata (sin servidor; requiere development build). */
-export async function notifyBudgetAlert(title: string, body: string): Promise<boolean> {
-  try {
-    await Notifications.scheduleNotificationAsync({ content: { title, body }, trigger: null });
-    return true;
-  } catch {
-    return false;
-  }
+// TODO(PUSH-TEMP): push desactivada temporalmente — descomentar para reactivar.
+// export async function notifyBudgetAlert(title: string, body: string): Promise<boolean> {
+//   try {
+//     await Notifications.scheduleNotificationAsync({ content: { title, body }, trigger: null });
+//     return true;
+//   } catch {
+//     return false;
+//   }
+// }
+export async function notifyBudgetAlert(_title: string, _body: string): Promise<boolean> {
+  // TEMP: sin push nativa, el llamador usa el fallback en-app.
+  return false;
 }

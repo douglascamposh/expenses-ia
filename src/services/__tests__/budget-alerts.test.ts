@@ -32,19 +32,28 @@ describe('budget-alerts (lógica pura)', () => {
     expect(notifiedKey('2026-09', 80, 'BOB')).toBe(base);
   });
 
-  it('notifyBudgetAlert programa la push y reporta éxito', async () => {
-    const Notifications = jest.requireMock('expo-notifications') as {
-      scheduleNotificationAsync: jest.Mock;
-    };
-    Notifications.scheduleNotificationAsync.mockClear();
-    await expect(notifyBudgetAlert('T', 'B')).resolves.toBe(true);
-    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith({
-      content: { title: 'T', body: 'B' },
-      trigger: null,
-    });
+  // TODO(PUSH-TEMP): push desactivada temporalmente — estos tests se reactivan al descomentar el código push.
+  // it('notifyBudgetAlert programa la push y reporta éxito', async () => {
+  //   const Notifications = jest.requireMock('expo-notifications') as {
+  //     scheduleNotificationAsync: jest.Mock;
+  //   };
+  //   Notifications.scheduleNotificationAsync.mockClear();
+  //   await expect(notifyBudgetAlert('T', 'B')).resolves.toBe(true);
+  //   expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith({
+  //     content: { title: 'T', body: 'B' },
+  //     trigger: null,
+  //   });
+  // });
+
+  // it('ensurePermissions concede si ya hay permiso', async () => {
+  //   await expect(ensurePermissions()).resolves.toBe(true);
+  // });
+
+  it('notifyBudgetAlert TEMP: retorna false (push desactivada, usa fallback en-app)', async () => {
+    await expect(notifyBudgetAlert('T', 'B')).resolves.toBe(false);
   });
 
-  it('ensurePermissions concede si ya hay permiso', async () => {
-    await expect(ensurePermissions()).resolves.toBe(true);
+  it('ensurePermissions TEMP: retorna false (push desactivada)', async () => {
+    await expect(ensurePermissions()).resolves.toBe(false);
   });
 });

@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.anonymous.expensesia"
+      "bundleIdentifier": "com.dech.expensesia"
     },
     "android": {
       "adaptiveIcon": {
@@ -25,7 +25,7 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
-      "package": "com.anonymous.expensesia",
+      "package": "com.dech.expensesia",
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
@@ -52,7 +52,6 @@
       "expo-asset",
       "expo-sqlite",
       "expo-localization",
-      "expo-notifications",
       "expo-speech-recognition"
     ],
     "experiments": {
