@@ -293,6 +293,8 @@ export function DashboardScreen() {
   }, [searchQuery, searchOpen, handleHomeSearch, dispatch]);
 
   const openSearch = useCallback(() => setSearchOpen(true), []);
+  /** Lupa deshabilitada sin gastos en DB: no hay nada que buscar. */
+  const hasExpenses = (allExpenses ?? []).length > 0;
   const closeSearch = useCallback(() => {
     setSearchOpen(false);
     setSearchQuery('');
@@ -750,10 +752,13 @@ export function DashboardScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('dashboard_a11ySearchExpenses')}
+            accessibilityState={{ disabled: !hasExpenses }}
             onPress={openSearch}
-            style={styles.fabPillButton}
+            disabled={!hasExpenses}
+            style={[styles.fabPillButton, !hasExpenses && styles.fabPillButtonDisabled]}
+            testID="dashboard-search-button"
           >
-            <Search size={24} color={theme.text} />
+            <Search size={24} color={hasExpenses ? theme.text : theme.textSecondary} />
           </Pressable>
         </View>
 
@@ -865,7 +870,7 @@ const styles = StyleSheet.create({
   welcomeSub: { fontSize: 15, fontFamily: Fonts.sans, color: 'rgba(255,255,255,0.85)' },
   onboardingRow: { flexDirection: 'row', gap: Spacing.two },
   onboardingCard: { flex: 1, borderRadius: 20, padding: Spacing.three, gap: Spacing.two },
-  suggestRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  suggestRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', rowGap: 8 },
   dashedCircle: {
     width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderStyle: 'dashed',
@@ -960,6 +965,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  fabPillButtonDisabled: { opacity: 0.4 },
   fabMic: {
     position: 'absolute',
     right: 16,

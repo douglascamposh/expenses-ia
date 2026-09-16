@@ -315,6 +315,36 @@ describe('Dashboard', () => {
     expect(getByLabelText('Guardar')).toBeTruthy();
   });
 
+  it('lupa deshabilitada sin gastos en DB y habilitada con gastos', async () => {
+    // Sin gastos: fetch devuelve [] -> botón deshabilitado
+    const { getByTestId, unmount } = renderWithStore();
+    await waitFor(() => expect(getByTestId('dashboard-search-button')).toBeTruthy());
+    await waitFor(() =>
+      expect(getByTestId('dashboard-search-button').props.accessibilityState?.disabled).toBe(true),
+    );
+    unmount();
+
+    // Con gastos: fetch devuelve 1 fila -> botón habilitado
+    const { expenseRepository } = jest.requireMock('@/expenses/repositories/ExpenseRepository') as {
+      expenseRepository: { getAll: jest.Mock };
+    };
+    const today = new Date().toISOString().split('T')[0];
+    const stamp = `${today}T12:00:00.000Z`;
+    expenseRepository.getAll.mockResolvedValueOnce([
+      {
+        id: 'e1', amount: 35, currency: 'BOB', category: 'FOOD', kind: 'EXPENSE', description: 'Almuerzo',
+        date: today, paymentMethod: 'CASH', createdAt: stamp, updatedAt: stamp,
+      },
+    ]);
+    const second = renderWithStore();
+    await waitFor(() =>
+      expect(second.getByTestId('dashboard-search-button').props.accessibilityState?.disabled).toBe(false),
+    );
+    // La lupa habilitada sigue abriendo el dock de búsqueda
+    fireEvent.press(second.getByLabelText('Buscar gastos'));
+    expect(second.getByTestId('home-search-input')).toBeTruthy();
+  });
+
   it('el toggle del hero filtra recientes por ingresos/gastos', async () => {
     const { expenseRepository } = jest.requireMock('@/expenses/repositories/ExpenseRepository') as {
       expenseRepository: { getByMonthRange: jest.Mock };
