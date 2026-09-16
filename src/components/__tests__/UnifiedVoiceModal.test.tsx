@@ -62,4 +62,21 @@ describe('UnifiedVoiceModal resultados (pantalla completa)', () => {
     const { queryByText } = renderResults({ expenses: [drafts[0]] } as never);
     expect(queryByText(/Save all/)).toBeNull();
   });
+
+  it('editor sin monedas: carrusel cambia categoría y fecha abre selector', () => {
+    const onSaveOne = jest.fn();
+    const { getAllByText, getByLabelText, queryByText } = renderResults({ onSaveOne });
+    fireEvent.press(getAllByText('Edit')[0]);
+    // Sin grilla de monedas (usa la del sistema)
+    expect(queryByText('USD')).toBeNull();
+    expect(queryByText('EUR')).toBeNull();
+    // Carrusel: cambiar a Transporte y guardar
+    fireEvent.press(getByLabelText('Transport'));
+    // Fecha abre el selector y elige un día
+    fireEvent.press(getByLabelText('Pick expense date'));
+    fireEvent.press(getByLabelText('Choose 2026-09-08'));
+    fireEvent.press(getAllByText('Save')[0]);
+    expect(onSaveOne).toHaveBeenCalledTimes(1);
+    expect(onSaveOne.mock.calls[0][1]).toMatchObject({ category: 'TRANSPORT', date: '2026-09-08' });
+  });
 });

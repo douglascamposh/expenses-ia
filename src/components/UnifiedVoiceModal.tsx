@@ -1,13 +1,13 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View, ScrollView } from 'react-native';
-import { Check, Mic, Square, X } from 'lucide-react-native';
+import { Check, ChevronDown, Mic, Square, X } from 'lucide-react-native';
 import { Text, Button, Chip, Input } from '@/components/ui';
 import { Modal } from '@/components/ui/Modal';
-import { CategoryPicker } from '@/components/CategoryPicker';
+import { DatePickerModal, formatDateDisplay } from '@/components/DatePickerModal';
 import { Spacing } from '@/constants/theme';
-import { getCategoryConfig } from '@/expenses/categories/expenseCategories';
-import { SUPPORTED_CURRENCIES, type NewExpense, type PaymentMethod } from '@/expenses/models/Expense';
+import { getAllCategories, getCategoryConfig } from '@/expenses/categories/expenseCategories';
+import { type NewExpense, type PaymentMethod } from '@/expenses/models/Expense';
 import { getPaymentEmoji, getPaymentLabel } from '@/expenses/models/Expense';
 import { formatCurrency } from '@/expenses/utils/format';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -42,6 +42,7 @@ export function UnifiedVoiceModal({ visible, phase, expenses, onStop, onClose, o
 
   const [drafts, setDrafts] = useState<NewExpense[]>(() => (Array.isArray(expenses) ? expenses.filter(Boolean) : []));
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [datePickerFor, setDatePickerFor] = useState<number | null>(null);
 
   useEffect(() => {
     setDrafts(Array.isArray(expenses) ? expenses.filter(Boolean) : []);
@@ -154,18 +155,41 @@ export function UnifiedVoiceModal({ visible, phase, expenses, onStop, onClose, o
                   <View style={styles.editBox}>
                     <Input value={String(draft.amount)} onChangeText={(txt) => updateDraft(index, { amount: parseFloat(txt) || 0 })} keyboardType="numeric" placeholder={t('voice_amountPh')} />
                     <Input value={draft.description} onChangeText={(txt) => updateDraft(index, { description: txt })} placeholder={t('voice_descPh')} />
-                    <CategoryPicker selected={draft.category} onSelect={(id) => updateDraft(index, { category: id as NewExpense['category'] })} />
-                    <View style={[styles.row, styles.currencyGrid]}>
-                      {SUPPORTED_CURRENCIES.map((cur) => (
-                        <Chip key={cur} label={cur} selected={draft.currency === cur} onPress={() => updateDraft(index, { currency: cur })} size="sm" />
-                      ))}
-                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catCarousel}>
+                      {getAllCategories().map((c) => {
+                        const active = String(c.id) === String(draft.category);
+                        return (
+                          <Pressable
+                            key={String(c.id)}
+                            accessibilityRole="button"
+                            accessibilityLabel={c.label}
+                            accessibilityState={{ selected: active }}
+                            onPress={() => updateDraft(index, { category: c.id as NewExpense['category'] })}
+                            style={[
+                              styles.catPill,
+                              { borderColor: active ? theme.text : theme.border, backgroundColor: theme.backgroundElement },
+                            ]}
+                          >
+                            <Text style={styles.catEmoji}>{c.emoji}</Text>
+                            <Text variant="smallBold" numberOfLines={1}>{c.label}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
                     <View style={styles.row}>
                       {PAYMENT_METHODS.map((m) => (
                         <Chip key={m} label={getPaymentLabel(m, lang)} icon={getPaymentEmoji(m)} selected={(draft.paymentMethod ?? 'CASH') === m} onPress={() => updateDraft(index, { paymentMethod: m })} size="sm" />
                       ))}
                     </View>
-                    <Input value={draft.date} onChangeText={(txt) => updateDraft(index, { date: txt })} placeholder={t('voice_datePh')} />
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t('voice_a11yPickDate')}
+                      onPress={() => setDatePickerFor(index)}
+                      style={[styles.dateChip, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}
+                    >
+                      <Text variant="smallBold">{formatDateDisplay(draft.date)}</Text>
+                      <ChevronDown size={14} color={theme.textSecondary} />
+                    </Pressable>
                   </View>
                 )}
 
@@ -182,6 +206,15 @@ export function UnifiedVoiceModal({ visible, phase, expenses, onStop, onClose, o
           <Button variant="ghost" size="md" style={{ flex: 1 }} onPress={onDismissResults}>{t('voice_cancelBtn')}</Button>
           {safeDrafts.length > 1 && <Button variant="primary" size="md" style={{ flex: 2 }} loading={saving} onPress={() => onSaveAll(safeDrafts)}>{t('voice_saveAll', { n: safeDrafts.length })}</Button>}
         </View>
+        <DatePickerModal
+          visible={datePickerFor !== null}
+          value={datePickerFor !== null ? safeDrafts[datePickerFor]?.date : undefined}
+          onClose={() => setDatePickerFor(null)}
+          onSelect={(date) => {
+            if (datePickerFor !== null) updateDraft(datePickerFor, { date });
+            setDatePickerFor(null);
+          }}
+        />
       </View>
     </Modal>
   );
@@ -219,7 +252,10 @@ const styles = StyleSheet.create({
   fill: { height: 6, borderRadius: 3 },
   editBox: { gap: Spacing.two, marginTop: Spacing.one },
   row: { flexDirection: 'row', gap: 8 },
-  currencyGrid: { flexWrap: 'wrap' },
+  catCarousel: { gap: 10, paddingVertical: 4, alignItems: 'center' },
+  catPill: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 999, borderWidth: 1.5, maxWidth: 220 },
+  catEmoji: { fontSize: 20 },
+  dateChip: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1 },
   cardActions: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.one },
   resultsFooter: { flexDirection: 'row', gap: Spacing.two, paddingTop: Spacing.two, borderTopWidth: 1 },
 });

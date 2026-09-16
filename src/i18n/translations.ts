@@ -324,6 +324,7 @@ const es = {
   voice_cancelBtn: 'Cancel',
   voice_saveAll: 'Save all ({n})',
   voice_a11yClose: 'Cerrar resultados',
+  voice_a11yPickDate: 'Elegir fecha del gasto',
 
   expenseConfirmation_title: 'New expense',
   expenseConfirmation_confidence: 'Confidence',
@@ -681,6 +682,7 @@ const en: Strings = {
   voice_cancelBtn: 'Cancel',
   voice_saveAll: 'Save all ({n})',
   voice_a11yClose: 'Close results',
+  voice_a11yPickDate: 'Pick expense date',
 
   expenseConfirmation_title: 'New expense',
   expenseConfirmation_confidence: 'Confidence',
