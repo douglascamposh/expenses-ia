@@ -9,6 +9,7 @@ import type { NewExpense } from '@/expenses/models/Expense';
 import { getCurrencySymbol } from '@/expenses/utils/format';
 import type { BudgetProgress } from '@/expenses/models/Budget';
 import type { CategorySummary } from '@/store/expensesSlice';
+import { useTheme } from '@/hooks/use-theme';
 
 /** Máximo visible en inicio; el resto vive en /budgets. */
 const MAX_ROWS = 6;
@@ -31,6 +32,7 @@ type Props = {
  * Presupuestadas primero (% desc), luego con gasto (total desc).
  */
 export function UnifiedCategories({ loading, budgets, summary, onOpenCategory, onSeeAll }: Props) {
+  const theme = useTheme();
   const rows = useMemo<Row[]>(() => {
     const budgeted = (budgets ?? []).filter(Boolean);
     const keys = new Set(budgeted.map((b) => `${b.category}|${b.currency}`));
@@ -58,7 +60,7 @@ export function UnifiedCategories({ loading, budgets, summary, onOpenCategory, o
         </Pressable>
       </View>
 
-      <ThemedView type="backgroundElement" style={styles.card}>
+      <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
         {loading ? (
           <Text color="textSecondary">Cargando...</Text>
         ) : rows.length === 0 ? (
@@ -98,7 +100,7 @@ export function UnifiedCategories({ loading, budgets, summary, onOpenCategory, o
 const styles = StyleSheet.create({
   section: { gap: Spacing.two },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  card: { borderRadius: 16, padding: Spacing.three, gap: Spacing.three, borderWidth: 1, borderColor: '#E4E2DE', backgroundColor: '#FFFFFF' },
+  card: { borderRadius: 16, padding: Spacing.three, gap: Spacing.three, borderWidth: 1 },
   spentRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   iconBox: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   emoji: { fontSize: 20 },

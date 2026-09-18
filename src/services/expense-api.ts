@@ -1,21 +1,43 @@
 import * as FileSystem from 'expo-file-system/legacy';
 
 import { getAuthToken } from './auth';
+import { logApiError, logApiWarn } from '@/utils/debug-log';
 
 /**
  * Expense API — envía audio a endpoint cloud y recibe gastos estructurados.
  * Basado en ejemplo del usuario: FormData { audio: {uri,name,type}, model: 'gemini', currentDate }
- * Base URL: https://expense-audio-analyzer-571414320359.us-east1.run.app
+ * Ambientes (ver .env / .env.qa / .env.example):
+ *   dev y qa → https://expense-audio-analyzer.ai.studio (mismo backend por ahora)
+ * Selección: EXPO_PUBLIC_API_URL (URL completa, máxima prioridad) o
+ * EXPO_PUBLIC_ENV=dev|qa. Scripts: `npm run ios` (dev), `npm run ios:qa` (qa).
  */
 
-export const ANALYZE_ENDPOINT =
-  'https://expense-audio-analyzer-571414320359.us-east1.run.app/api/analyze';
+const API_URLS = {
+  dev: 'https://expense-audio-analyzer.ai.studio',
+  qa: 'https://expense-audio-analyzer.ai.studio',
+} as const;
 
-export const ANALYZE_TEXT_ENDPOINT =
-  'https://expense-audio-analyzer-571414320359.us-east1.run.app/api/analyze-text';
+export type ApiEnv = keyof typeof API_URLS;
 
-export const EMBED_ENDPOINT =
-  'https://expense-audio-analyzer-571414320359.us-east1.run.app/api/embed';
+function resolveApiBaseUrl(): string {
+  const direct = process.env.EXPO_PUBLIC_API_URL;
+  if (direct && direct.length > 0) return direct;
+  const env = process.env.EXPO_PUBLIC_ENV;
+  if (env === 'qa' || env === 'dev') return API_URLS[env];
+  return API_URLS.dev;
+}
+
+/** Ambiente activo (útil para debug / diagnostics). */
+export const API_ENV: ApiEnv =
+  process.env.EXPO_PUBLIC_ENV === 'qa' && !process.env.EXPO_PUBLIC_API_URL ? 'qa' : 'dev';
+
+const API_BASE_URL = resolveApiBaseUrl();
+
+export const ANALYZE_ENDPOINT = `${API_BASE_URL}/api/analyze`;
+
+export const ANALYZE_TEXT_ENDPOINT = `${API_BASE_URL}/api/analyze-text`;
+
+export const EMBED_ENDPOINT = `${API_BASE_URL}/api/embed`;
 
 export type EmbedResult = {
   vector: Float32Array;
@@ -95,15 +117,78 @@ const UNAVAILABLE_HINTS = [
 export function isServiceUnavailable(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const status = (error as { status?: unknown }).status;
+  // 401 = auth (token), no servicio caído: lo maneja fetchWithAuth con retry.
   if (typeof status === 'number' && UNAVAILABLE_STATUSES.has(status)) return true;
   const message = String((error as { message?: unknown }).message ?? '').toLowerCase();
   return UNAVAILABLE_HINTS.some((hint) => message.includes(hint));
 }
 
 /**
+ * Fragmentos que indican token expirado/inválido en el cuerpo del backend
+ * (p. ej. "Token de autenticación inválido o expirado", "token expired").
+ * fetchWithAuth los trata como 401: reintenta con token fresco en vez de
+ * mostrar el error crudo.
+ */
+const EXPIRED_TOKEN_HINTS = [
+  // EN
+  'token expired',
+  'token has expired',
+  'expired token',
+  'invalid token',
+  'invalid id token',
+  'id token expired',
+  'auth/id-token-expired',
+  'auth/id-token-revoked',
+  'auth/user-token-expired',
+  'unauthorized',
+  // ES — el matching se hace sin acentos, así que cubre "inválido"/"invalido"
+  // y "autenticación"/"autenticacion" con una sola variante.
+  'token expirado',
+  'sesion expirada',
+  'token de autenticacion',
+  'token invalido',
+  'autenticacion expirada',
+  'invalido o expirado',
+  'no autorizado',
+];
+
+/** Minúsculas y sin acentos, para matching robusto (inválido = invalido). */
+function normalizeForHint(text: string): string {
+  return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+/** True cuando el cuerpo del backend indica token expirado/inválido. */
+function isExpiredTokenBody(json: unknown): boolean {
+  if (!json || typeof json !== 'object') return false;
+  const text = normalizeForHint(JSON.stringify(json));
+  return EXPIRED_TOKEN_HINTS.some((hint) => text.includes(normalizeForHint(hint)));
+}
+
+/**
+ * Mensaje amable cuando el backend sigue rechazando la sesión incluso con un
+ * token forzadamente fresco (p. ej. valida otro proyecto Firebase). Nunca
+ * mostramos el texto crudo "Token expirado / invalid token" al usuario.
+ */
+const SESSION_INVALID_MESSAGE = 'Sesión expirada. Intenta de nuevo.';
+
+/** AnalyzeError para respuestas !ok, con mensaje amable si el fallo es de token. */
+function analyzeErrorFromResponse(
+  response: Response,
+  json: AnalyzeResponse | Expense[],
+  fallback: string,
+): AnalyzeError {
+  const raw = (json as AnalyzeResponse)?.error;
+  const message = typeof raw === 'string' && raw.length > 0 ? raw : undefined;
+  const authProblem = response.status === 401 || isExpiredTokenBody(json);
+  return new AnalyzeError(authProblem ? SESSION_INVALID_MESSAGE : message || fallback, response.status);
+}
+
+/**
  * fetch con `Authorization: Bearer <Firebase ID token>`.
  * El backend valida el token con Admin SDK y ata la cuota al UID.
- * Ante un 401 reintenta una sola vez con token forzadamente fresco.
+ * Token expirado (401 o cuerpo "token expired"): reintenta una sola vez con
+ * token forzadamente fresco. Si el retry también falla, se propaga la
+ * respuesta para que el llamador muestre el error real, nunca un retry mudo.
  */
 async function fetchWithAuth(url: string, init: RequestInit): Promise<Response> {
   const call = async (forceRefresh: boolean): Promise<Response> => {
@@ -113,7 +198,24 @@ async function fetchWithAuth(url: string, init: RequestInit): Promise<Response> 
     return fetch(url, { ...init, headers });
   };
   const first = await call(false);
-  if (first.status === 401) return call(true);
+  // 401 explícito o cuerpo con mensaje de token vencido/inválido → reintento único.
+  let expiredBody = false;
+  if (first.status !== 401) {
+    // Clonamos para no consumir el body: el llamador lo parsea después.
+    try {
+      const clone = first.clone();
+      expiredBody = isExpiredTokenBody((await clone.json()) as unknown);
+    } catch {
+      // Body no-JSON (audio binario, HTML): no es token expirado, seguir normal.
+    }
+  }
+  if (first.status === 401 || expiredBody) {
+    logApiWarn('expense-api/fetchWithAuth', 'Token rechazado por el backend; reintentando con token fresco.', {
+      url,
+      status: first.status,
+    });
+    return call(true);
+  }
   return first;
 }
 
@@ -145,8 +247,8 @@ export async function analyzeAudio(
       formData.append('audio', typedBlob, 'recording.m4a');
       audioAppended = true;
     }
-  } catch {
-    // ignore, try next method
+  } catch (e) {
+    logApiWarn('expense-api/analyzeAudio', 'Lectura del audio vía fetch falló; probando FileSystem Base64.', { error: String(e) });
   }
 
   if (!audioAppended) {
@@ -160,8 +262,8 @@ export async function analyzeAudio(
       const blob = new Blob([bytes], { type: 'audio/m4a' });
       formData.append('audio', blob, 'recording.m4a');
       audioAppended = true;
-    } catch {
-      // último fallback: objeto uri (React Native extension)
+    } catch (e) {
+      logApiWarn('expense-api/analyzeAudio', 'Lectura del audio vía Base64 falló; usando fallback objeto uri.', { error: String(e) });
     }
   }
 
@@ -191,23 +293,29 @@ export async function analyzeAudio(
       },
     });
   } catch (e) {
+    logApiError('expense-api/analyzeAudio', e, { endpoint: ANALYZE_ENDPOINT });
     throw new AnalyzeError((e as Error).message ?? 'Error de red al analizar audio');
   }
 
   let json: AnalyzeResponse | Expense[] = {} as AnalyzeResponse;
   try {
     json = (await response.json()) as AnalyzeResponse | Expense[];
-  } catch {
+  } catch (e) {
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      throw new AnalyzeError(`Error ${response.status}: ${text || response.statusText}`.trim(), response.status);
+      const err = new AnalyzeError(`Error ${response.status}: ${text || response.statusText}`.trim(), response.status);
+      logApiError('expense-api/analyzeAudio', err, { endpoint: ANALYZE_ENDPOINT, body: text.slice(0, 300) });
+      throw err;
     }
-    throw new AnalyzeError('Respuesta inválida del servidor');
+    const err = new AnalyzeError('Respuesta inválida del servidor');
+    logApiError('expense-api/analyzeAudio', e, { endpoint: ANALYZE_ENDPOINT, status: response.status, cause: err.message });
+    throw err;
   }
 
   if (!response.ok) {
-    const errMsg = (json as AnalyzeResponse)?.error as string | undefined;
-    throw new AnalyzeError((errMsg as string) || `Error ${response.status} procesando el audio`, response.status);
+    const err = analyzeErrorFromResponse(response, json, `Error ${response.status} procesando el audio`);
+    logApiError('expense-api/analyzeAudio', err, { endpoint: ANALYZE_ENDPOINT, body: JSON.stringify(json).slice(0, 500) });
+    throw err;
   }
 
   // Log latencia si viene
@@ -285,23 +393,29 @@ export async function analyzeText(
       body: JSON.stringify(body),
     });
   } catch (e) {
+    logApiError('expense-api/analyzeText', e, { endpoint: ANALYZE_TEXT_ENDPOINT });
     throw new AnalyzeError((e as Error).message ?? 'Error de red al analizar texto');
   }
 
   let json: AnalyzeResponse | Expense[] = {} as AnalyzeResponse;
   try {
     json = (await response.json()) as AnalyzeResponse | Expense[];
-  } catch {
+  } catch (e) {
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      throw new AnalyzeError(`Error ${response.status}: ${text || response.statusText}`.trim(), response.status);
+      const err = new AnalyzeError(`Error ${response.status}: ${text || response.statusText}`.trim(), response.status);
+      logApiError('expense-api/analyzeText', err, { endpoint: ANALYZE_TEXT_ENDPOINT, body: text.slice(0, 300) });
+      throw err;
     }
-    throw new AnalyzeError('Respuesta inválida del servidor');
+    const err = new AnalyzeError('Respuesta inválida del servidor');
+    logApiError('expense-api/analyzeText', e, { endpoint: ANALYZE_TEXT_ENDPOINT, status: response.status, cause: err.message });
+    throw err;
   }
 
   if (!response.ok) {
-    const errMsg = (json as AnalyzeResponse)?.error as string | undefined;
-    throw new AnalyzeError((errMsg as string) || `Error ${response.status} procesando el texto`, response.status);
+    const err = analyzeErrorFromResponse(response, json, `Error ${response.status} procesando el texto`);
+    logApiError('expense-api/analyzeText', err, { endpoint: ANALYZE_TEXT_ENDPOINT, body: JSON.stringify(json).slice(0, 500) });
+    throw err;
   }
 
   if (!Array.isArray(json) && typeof (json as AnalyzeResponse).latency === 'number') {
@@ -331,17 +445,26 @@ export async function embedText(text: string, endpoint: string = EMBED_ENDPOINT)
       body: JSON.stringify({ text }),
     });
   } catch (e) {
+    logApiError('expense-api/embedText', e, { endpoint });
     throw new EmbedError((e as Error).message ?? 'Error de red al generar embedding');
   }
   let json: Record<string, unknown>;
   try {
     json = (await response.json()) as Record<string, unknown>;
-  } catch {
-    throw new EmbedError('Respuesta inválida del endpoint de embeddings', response.status);
+  } catch (e) {
+    const err = new EmbedError('Respuesta inválida del endpoint de embeddings', response.status);
+    logApiError('expense-api/embedText', e, { endpoint, status: response.status, cause: err.message });
+    throw err;
   }
   if (!response.ok) {
     const errMsg = typeof json?.error === 'string' ? json.error : undefined;
-    throw new EmbedError(errMsg || `Error ${response.status} generando embedding`, response.status);
+    const authProblem = response.status === 401 || isExpiredTokenBody(json);
+    const err = new EmbedError(
+      authProblem ? SESSION_INVALID_MESSAGE : errMsg || `Error ${response.status} generando embedding`,
+      response.status,
+    );
+    logApiError('expense-api/embedText', err, { endpoint, body: JSON.stringify(json).slice(0, 500) });
+    throw err;
   }
   const raw = json.embedding ?? json.vector ?? json.data;
   if (!Array.isArray(raw) || raw.length === 0) {

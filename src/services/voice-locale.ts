@@ -23,6 +23,21 @@ export function flagForRegion(region: string): string {
   return String.fromCodePoint(...[...r].map((c) => 127397 + c.charCodeAt(0)));
 }
 
+/** Bandera por idioma (es → 🇪🇸, en → 🇺🇸). Fallback cuando no hay región. */
+export function flagForLang(lang: unknown): string {
+  const l = String(lang ?? '').trim().toLowerCase().split('-')[0];
+  if (l === 'es') return '🇪🇸';
+  if (l === 'en') return '🇺🇸';
+  return '🌐';
+}
+
+/** Bandera del reconocimiento: región si se conoce, si no el idioma de la app. */
+export function flagForSpeech(locale: unknown, appLang: AppLang = 'es'): string {
+  const region = regionOf(String(locale ?? ''));
+  if (/^[A-Z]{2}$/.test(region)) return flagForRegion(region);
+  return flagForLang(langOf(norm(String(locale ?? ''))) || appLang);
+}
+
 /**
  * Elige el locale de reconocimiento sin forzar descargas:
  * 1. tag exacto del dispositivo ya instalado (offline, cero descargas),

@@ -1,8 +1,5 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-// TODO(PUSH-TEMP): push desactivada temporalmente — descomentar para reactivar.
-// import * as Notifications from 'expo-notifications';
-// import { useEffect } from 'react';
 import { useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';

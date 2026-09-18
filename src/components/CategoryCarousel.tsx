@@ -264,7 +264,7 @@ export function CategoryCarousel({
                       {cat.hasBudget ? Math.round(cat.pct) : Math.round(share)}%
                     </Text>
                     {cat.hasBudget && (
-                      <Text style={styles.remaining}>
+                      <Text style={[styles.remaining, { color: theme.income }]}>
                         {cat.pct > 100
                           ? t('carousel_over', { n: Math.round(cat.pct) - 100 })
                           : t('carousel_remaining', { n: Math.max(0, 100 - Math.round(cat.pct)) })}
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
   emojiLarge: { fontSize: 24, lineHeight: 30, fontFamily: Fonts.sans },
   amount: { fontSize: 16, fontWeight: '700', fontFamily: Fonts.sans },
   pct: { fontSize: 12, fontWeight: '500', fontFamily: Fonts.sans },
-  remaining: { fontSize: 10, fontWeight: '700', fontFamily: Fonts.sans, color: '#5A9E4B' },
+  remaining: { fontSize: 10, fontWeight: '700', fontFamily: Fonts.sans },
   barsRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',

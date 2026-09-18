@@ -38,20 +38,20 @@ const drafts: NewExpense[] = [
 ];
 
 describe('repro: flujo Save completo en Dashboard', () => {
-  it('Save guarda en repo y limpia la cola sin crash', async () => {
+  it('Guardar guarda en repo y limpia la cola sin crash', async () => {
     const testStore = configureStore({
       reducer: { expenses: expensesReducer, settings: settingsReducer, categories: categoriesReducer },
       middleware: (g) => g({ serializableCheck: false }),
     });
-    const { getAllByText, queryByText } = render(
+    const { getAllByLabelText, queryByText } = render(
       <Provider store={testStore}>
         <DashboardScreen />
       </Provider>,
     );
     // Simular llegada de resultados del servidor
     testStore.dispatch(setPendingQueue(drafts.map((d) => ({ ...d }))));
-    await waitFor(() => expect(getAllByText('Save').length).toBeGreaterThan(0));
-    fireEvent.press(getAllByText('Save')[0]);
+    await waitFor(() => expect(getAllByLabelText('Guardar').length).toBeGreaterThan(0));
+    fireEvent.press(getAllByLabelText('Guardar')[0]);
     // El thunk debe guardar y remover 1 de la cola -> queda 1 gasto detectado
     await waitFor(() => expect(queryByText('1 gasto detectado')).toBeTruthy(), { timeout: 5000 });
     expect(testStore.getState().expenses.saveError).toBeNull();

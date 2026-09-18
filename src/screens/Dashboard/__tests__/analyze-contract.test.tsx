@@ -52,7 +52,7 @@ describe('mic PoC → transcripción', () => {
         <DashboardScreen />
       </Provider>,
     );
-    await waitFor(() => expect(getByText(/No expenses yet/)).toBeTruthy());
+    await waitFor(() => expect(getByText(/Sin gastos todavía/)).toBeTruthy());
     fireEvent.press(getByLabelText('Grabar gasto por voz'));
     expect(mockPush).toHaveBeenCalledWith('/voice-text');
   });

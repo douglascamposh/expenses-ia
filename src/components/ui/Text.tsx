@@ -4,7 +4,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Fonts } from '@/constants/theme';
 import type { ThemeColor } from '@/constants/theme';
 
-export type TextVariant = 'h1' | 'h2' | 'h3' | 'body' | 'bodyBold' | 'small' | 'smallBold' | 'caption' | 'code' | 'title' | 'subtitle' | 'default' | 'link' | 'linkPrimary';
+export type TextVariant = 'h1' | 'h2' | 'h3' | 'body' | 'bodyBold' | 'small' | 'smallBold' | 'caption' | 'code' | 'title' | 'subtitle' | 'display' | 'hero' | 'default' | 'link' | 'linkPrimary';
 export type TextColor = ThemeColor | 'white' | 'primary' | 'danger' | 'success' | 'warning';
 
 type Props = RNTextProps & {
@@ -23,29 +23,23 @@ const variantMap: Record<TextVariant, TextStyle> = {
   h2:      { fontSize: 22, lineHeight: 28, fontWeight: '700', fontFamily: Fonts.sans, letterSpacing: -0.2 },
   subtitle:{ fontSize: 20, lineHeight: 26, fontWeight: '600', fontFamily: Fonts.sans, letterSpacing: -0.2 },
   h3:      { fontSize: 17, lineHeight: 24, fontWeight: '600', fontFamily: Fonts.sans },
+  display: { fontSize: 30, lineHeight: 38, fontWeight: '800', fontFamily: Fonts.sans, letterSpacing: -0.5 },
+  hero:    { fontSize: 56, lineHeight: 64, fontWeight: '800', fontFamily: Fonts.sans, letterSpacing: -1 },
   body:    { fontSize: 17, lineHeight: 24, fontWeight: '400', fontFamily: Fonts.sans },
   default: { fontSize: 17, lineHeight: 24, fontWeight: '400', fontFamily: Fonts.sans },
   bodyBold:{ fontSize: 17, lineHeight: 24, fontWeight: '700', fontFamily: Fonts.sans },
   small:   { fontSize: 15, lineHeight: 20, fontWeight: '400', fontFamily: Fonts.sans },
   smallBold:{ fontSize: 15, lineHeight: 20, fontWeight: '700', fontFamily: Fonts.sans },
   caption: { fontSize: 13, lineHeight: 18, fontWeight: '400', fontFamily: Fonts.sans },
-  code:    { fontSize: 13, fontWeight: PlatformOSWeight(), fontFamily: Fonts.mono },
+  code:    { fontSize: 13, fontWeight: '500', fontFamily: Fonts.mono },
   link:    { fontSize: 17, lineHeight: 24, fontWeight: '400', fontFamily: Fonts.sans },
-  linkPrimary: { fontSize: 17, lineHeight: 24, fontWeight: '400', fontFamily: Fonts.sans, color: '#2F80FF' },
+  linkPrimary: { fontSize: 17, lineHeight: 24, fontWeight: '400', fontFamily: Fonts.sans },
 };
 
-function PlatformOSWeight(): TextStyle['fontWeight'] {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { Platform } = require('react-native');
-  return Platform.OS === 'android' ? '700' : '500';
-}
-
 const colorMap: Record<string, string> = {
+  // Los colores del tema (primary, danger…) se resuelven contra el esquema
+  // activo arriba; aquí solo quedan los intencionalmente fijos.
   white: '#FFFFFF',
-  primary: '#2F80FF',
-  danger: '#EF4444',
-  success: '#0EB07B',
-  warning: '#F59E0B',
 };
 
 export function Text({ variant, type, color, themeColor, weight, align, style, children, ...rest }: Props) {

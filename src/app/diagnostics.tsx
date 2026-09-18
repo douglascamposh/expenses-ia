@@ -17,7 +17,7 @@ export default function DiagnosticsScreen() {
           <ThemedText type="smallBold">Notas</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             • Audio: m4a 44.1kHz mono 128kbps (HIGH_QUALITY optimizado para API)
-            • API: https://expense-audio-analyzer-571414320359.us-east1.run.app/api/analyze
+            • API: https://expense-audio-analyzer.ai.studio/api/analyze
             • DB: SQLite v1, tabla expenses, WAL
             • Offline: Dashboard y SQLite funcionan sin Internet; API requiere red
           </ThemedText>

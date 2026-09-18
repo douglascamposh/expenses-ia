@@ -7,6 +7,7 @@ import { QuickExpenseForm } from '@/components/QuickExpenseForm';
 import { Spacing } from '@/constants/theme';
 import { DEFAULT_CURRENCY, type Currency, type NewExpense } from '@/expenses/models/Expense';
 import { useTranslation } from '@/i18n/useTranslation';
+import { useTheme } from '@/hooks/use-theme';
 
 function todayISO(): string {
   return new Date().toISOString().split('T')[0];
@@ -40,6 +41,7 @@ type Props = {
 
 export function ManualExpenseModal({ visible, saving, onClose, onSave, initial, defaultCurrency = DEFAULT_CURRENCY, resetKey = 0 }: Props) {
   const { t } = useTranslation();
+  const theme = useTheme();
   const [draft, setDraft] = useState<NewExpense>(() => ({ ...freshDraft(defaultCurrency), ...initial, currency: defaultCurrency }));
   const appliedRef = useRef<number | null>(null);
 
@@ -60,9 +62,9 @@ export function ManualExpenseModal({ visible, saving, onClose, onSave, initial, 
           accessibilityRole="button"
           accessibilityLabel={t('quick_a11yCloseForm')}
           onPress={onClose}
-          style={styles.closeBtn}
+          style={[styles.closeBtn, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
         >
-          <X size={22} color="#0F172A" />
+          <X size={22} color={theme.text} />
         </Pressable>
         <QuickExpenseForm
           value={draft}
@@ -80,7 +82,7 @@ const styles = StyleSheet.create({
   container: { width: '100%', minHeight: Math.round(Dimensions.get('window').height * 0.8), gap: Spacing.two, paddingTop: Spacing.one },
   closeBtn: {
     width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#FFFFFF', alignSelf: 'flex-end',
+    borderWidth: 1, alignSelf: 'flex-end',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
 });

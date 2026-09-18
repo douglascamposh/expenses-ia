@@ -112,9 +112,9 @@ export function BudgetCategoryRow({
             accessibilityRole="button"
             accessibilityLabel={t('budgets_a11ySave')}
             onPress={handleSave}
-            style={styles.saveCircle}
+            style={[styles.saveCircle, { backgroundColor: theme.dark }]}
           >
-            <Check size={22} color="#FFFFFF" strokeWidth={3} />
+            <Check size={22} color={theme.white} strokeWidth={3} />
           </Pressable>
         </View>
       )}
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   editor: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   amountInput: { flex: 1, borderWidth: 1.5, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, fontSize: 18, fontWeight: '700', fontFamily: Fonts.sans },
   currencyBadge: { borderWidth: 1.5, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14 },
-  saveCircle: { width: 52, height: 52, borderRadius: 16, backgroundColor: '#2B2B2B', alignItems: 'center', justifyContent: 'center' },
+  saveCircle: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 });
 
 export default BudgetCategoryRow;

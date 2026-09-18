@@ -4,6 +4,7 @@ import {
   signInAnonymously,
   type User,
 } from '@react-native-firebase/auth';
+import { logApiError } from '@/utils/debug-log';
 
 /**
  * Auth Firebase — sesión anónima silenciosa + ID tokens para el backend.
@@ -33,7 +34,9 @@ function toAuthError(e: unknown, fallback: string): AuthError {
       : code === 'auth/operation-not-allowed'
         ? 'Login anónimo no habilitado en Firebase Console.'
         : fallback;
-  return new AuthError(message, code);
+  const authError = new AuthError(message, code);
+  logApiError('auth', authError, { code, cause: (e as Error)?.message ?? String(e) });
+  return authError;
 }
 
 /** Sesión anónima en vuelo (evita sign-ins duplicados concurrentes). */

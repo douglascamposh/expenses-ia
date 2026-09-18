@@ -1,4 +1,4 @@
-import { flagForRegion, isLocaleInstalled, resolveSpeechLocale } from '../voice-locale';
+import { flagForLang, flagForRegion, flagForSpeech, isLocaleInstalled, resolveSpeechLocale } from '../voice-locale';
 
 describe('voice-locale', () => {
   const full = { locales: ['es-AR', 'es-MX', 'en-US'], installedLocales: ['es-AR', 'es-MX'] };
@@ -40,5 +40,15 @@ describe('voice-locale', () => {
     expect(flagForRegion('AR')).toBe('🇦🇷');
     expect(flagForRegion('mx')).toBe('🇲🇽');
     expect(flagForRegion('')).toBe('🌐');
+  });
+
+  it('flagForSpeech prefiere región y cae al idioma', () => {
+    expect(flagForSpeech('es-AR', 'es')).toBe('🇦🇷');
+    expect(flagForSpeech('es-MX', 'es')).toBe('🇲🇽');
+    expect(flagForSpeech('', 'es')).toBe('🇪🇸');
+    expect(flagForSpeech('', 'en')).toBe('🇺🇸');
+    expect(flagForLang('es')).toBe('🇪🇸');
+    expect(flagForLang('en-US')).toBe('🇺🇸');
+    expect(flagForLang('fr')).toBe('🌐');
   });
 });

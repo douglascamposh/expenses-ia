@@ -70,9 +70,9 @@ export function ThresholdSlider({ value, onCommit, onSlidingChange }: Props) {
       accessibilityValue={{ min: THRESHOLD_MIN, max: THRESHOLD_MAX, now: local }}
     >
       <View style={[styles.track, { backgroundColor: theme.border }]}>
-        <View style={[styles.fill, { width: valueToX(local) }]} />
+        <View style={[styles.fill, { width: valueToX(local), backgroundColor: theme.expense }]} />
       </View>
-      <View style={[styles.thumb, { left: Math.max(0, valueToX(local) - 14) }]} />
+      <View style={[styles.thumb, { left: Math.max(0, valueToX(local) - 14), backgroundColor: theme.white }]} />
     </View>
   );
 }
@@ -81,14 +81,13 @@ const styles = StyleSheet.create({
   // Área táctil alta: la pista visual de 8px es casi imposible de agarrar.
   hitArea: { paddingVertical: 14, justifyContent: 'center' },
   track: { height: 8, borderRadius: 4, overflow: 'hidden' },
-  fill: { height: 8, borderRadius: 4, backgroundColor: '#F0524D' },
+  fill: { height: 8, borderRadius: 4 },
   thumb: {
     position: 'absolute',
     top: -10,
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,

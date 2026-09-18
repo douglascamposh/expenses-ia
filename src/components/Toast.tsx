@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { XCircle } from 'lucide-react-native';
 import { Fonts, Spacing } from '@/constants/theme';
 import { Text } from '@/components/ui';
+import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
   visible: boolean;
@@ -13,8 +14,9 @@ type Props = {
   onDismiss: () => void;
 };
 
-/** Toast inferior estilo mockup: tarjeta blanca + icono + mensaje, auto-cierre. */
+/** Toast inferior estilo mockup: tarjeta + icono + mensaje, auto-cierre. */
 export function Toast({ visible, message, tone = 'error', durationMs = 2800, onDismiss }: Props) {
+  const theme = useTheme();
   useEffect(() => {
     if (!visible) return undefined;
     const t = setTimeout(onDismiss, durationMs);
@@ -28,10 +30,10 @@ export function Toast({ visible, message, tone = 'error', durationMs = 2800, onD
         accessibilityRole="button"
         accessibilityLabel={message}
         onPress={onDismiss}
-        style={styles.card}
+        style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
       >
-        <XCircle size={28} color={tone === 'error' ? '#F0524D' : '#2B2B2B'} />
-        <Text variant="smallBold" style={styles.message} numberOfLines={3}>
+        <XCircle size={28} color={tone === 'error' ? theme.expense : theme.dark} />
+        <Text variant="smallBold" style={[styles.message, { color: theme.text }]} numberOfLines={3}>
           {message}
         </Text>
       </Pressable>
@@ -54,13 +56,13 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     width: '100%',
     borderRadius: 20,
+    borderWidth: 1,
     padding: Spacing.three,
-    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 24,
     elevation: 12,
   },
-  message: { flex: 1, fontSize: 16, fontFamily: Fonts.sans, color: '#111111' },
+  message: { flex: 1, fontSize: 16, fontFamily: Fonts.sans },
 });

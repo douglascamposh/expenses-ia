@@ -36,6 +36,7 @@ import {
   createExpense,
   deleteExpense,
   fetchExpenses,
+  removePendingAt,
   saveAllExpenses,
   saveOneExpense,
   semanticSearch,
@@ -399,6 +400,15 @@ export function DashboardScreen() {
     [dispatch, t],
   );
 
+  /** Quita un borrador de la revisión (tras confirmar en el modal). */
+  const handleDeleteOne = useCallback(
+    (index: number) => {
+      if (typeof index !== 'number') return;
+      dispatch(removePendingAt(index));
+    },
+    [dispatch],
+  );
+
   const handleSaveManual = useCallback(
     (draft: NewExpense) => {
       // Snapshot serializable; con recurrencia crea regla + gasto actual.
@@ -548,7 +558,7 @@ export function DashboardScreen() {
             >
               <View style={styles.giantRow}>
                 <View style={[styles.signBadge, { backgroundColor: giantColor }]}>
-                  <Text style={styles.signText}>{giantSign}</Text>
+                  <Text style={[styles.signText, { color: theme.white }]}>{giantSign}</Text>
                 </View>
                 <Text style={[styles.giant, { color: theme.text }]}>{loading ? '…' : fmtShort(giantValue)}</Text>
                 <Text style={[styles.giantCur, { color: theme.textSecondary }]}>{heroSymbol}</Text>
@@ -561,8 +571,8 @@ export function DashboardScreen() {
                 onPress={() => setHeroMode((m) => (m === 'exp' ? 'net' : 'exp'))}
                 style={[styles.toggleSeg, heroMode === 'exp' && { backgroundColor: theme.backgroundSelected }]}
               >
-                <View style={[styles.miniBadge, { backgroundColor: '#F0524D' }]}>
-                  <Text style={styles.miniSign}>-</Text>
+                <View style={[styles.miniBadge, { backgroundColor: theme.expense }]}>
+                  <Text style={[styles.miniSign, { color: theme.white }]}>-</Text>
                 </View>
                 <Text variant="smallBold">{fmtShort(heroExp)}</Text>
               </Pressable>
@@ -573,7 +583,7 @@ export function DashboardScreen() {
                 style={[styles.toggleSeg, heroMode === 'inc' && { backgroundColor: theme.backgroundSelected }]}
               >
                 <View style={[styles.miniBadge, { backgroundColor: theme.success }]}>
-                  <Text style={styles.miniSign}>+</Text>
+                  <Text style={[styles.miniSign, { color: theme.white }]}>+</Text>
                 </View>
                 <Text variant="smallBold">{fmtShort(heroInc)}</Text>
               </Pressable>
@@ -603,8 +613,8 @@ export function DashboardScreen() {
               end={{ x: 1, y: 1 }}
               style={styles.welcomeCard}
             >
-              <Text style={styles.welcomeTitle}>{t('dashboard_hello')}</Text>
-              <Text style={styles.welcomeTitle}>{t('dashboard_welcomeTitle')}</Text>
+              <Text style={[styles.welcomeTitle, { color: theme.white }]}>{t('dashboard_hello')}</Text>
+              <Text style={[styles.welcomeTitle, { color: theme.white }]}>{t('dashboard_welcomeTitle')}</Text>
               <Text style={styles.welcomeSub}>{t('dashboard_welcomeSub')}</Text>
             </LinearGradient>
 
@@ -819,6 +829,7 @@ export function DashboardScreen() {
         onCancelAnalyzing={handleCancelAnalyzing}
         onSaveOne={handleSaveOne}
         onSaveAll={handleSaveAll}
+        onDeleteOne={handleDeleteOne}
         onDismissResults={handleDismissResults}
         saving={saving}
       />
@@ -901,7 +912,7 @@ const styles = StyleSheet.create({
   carouselBleed: { marginHorizontal: -Spacing.four },
   onboarding: { gap: Spacing.three },
   welcomeCard: { borderRadius: 24, padding: Spacing.four, gap: 2 },
-  welcomeTitle: { fontSize: 26, lineHeight: 32, fontWeight: '800', fontFamily: Fonts.sans, color: '#FFFFFF' },
+  welcomeTitle: { fontSize: 26, lineHeight: 32, fontWeight: '800', fontFamily: Fonts.sans },
   welcomeSub: { fontSize: 15, fontFamily: Fonts.sans, color: 'rgba(255,255,255,0.85)' },
   onboardingRow: { flexDirection: 'row', gap: Spacing.two },
   onboardingCard: { flex: 1, borderRadius: 20, padding: Spacing.three, gap: Spacing.two },
@@ -938,7 +949,7 @@ const styles = StyleSheet.create({
   heroCompact: { gap: 2, paddingTop: 0 },
   giantRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   signBadge: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  signText: { color: '#FFFFFF', fontSize: 18, lineHeight: 22, fontWeight: '800', fontFamily: Fonts.sans, textAlign: 'center' },
+  signText: { fontSize: 18, lineHeight: 22, fontWeight: '800', fontFamily: Fonts.sans, textAlign: 'center' },
   giant: { fontSize: 56, lineHeight: 64, fontWeight: '800', fontFamily: Fonts.sans, letterSpacing: -1 },
   giantCur: { fontSize: 22, lineHeight: 28, fontFamily: Fonts.sans },
   togglePill: {
@@ -955,16 +966,8 @@ const styles = StyleSheet.create({
   },
   toggleSeg: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 999 },
   miniBadge: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  miniSign: { color: '#FFFFFF', fontSize: 13, lineHeight: 16, fontWeight: '800', fontFamily: Fonts.sans, textAlign: 'center' },
-  vsText: { color: '#0EB07B', fontSize: 12, fontWeight: '600', fontFamily: Fonts.sans },
-  // Spending
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.two },
+  miniSign: { fontSize: 13, lineHeight: 16, fontWeight: '800', fontFamily: Fonts.sans, textAlign: 'center' },
   sectionHeaderRight: { flexDirection: 'row', gap: Spacing.three, alignItems: 'center' },
-  filterRow: { flexDirection: 'row', gap: Spacing.two, paddingVertical: Spacing.one },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: '#E4E2DE', backgroundColor: '#fff' },
-  filterActive: { backgroundColor: '#2F80FF1A', borderColor: '#2F80FF' },
-  currencyRow: { flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap', justifyContent: 'center' },
-  list: { gap: Spacing.two },
   dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.two, marginBottom: Spacing.one },
   dayPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999 },
   emptyCard: { borderRadius: 16, padding: Spacing.four, alignItems: 'center', gap: Spacing.two, borderWidth: 1 },

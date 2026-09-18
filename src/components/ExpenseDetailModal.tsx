@@ -7,6 +7,7 @@ import { QuickExpenseForm } from '@/components/QuickExpenseForm';
 import { Spacing } from '@/constants/theme';
 import type { Expense, Frequency, NewExpense } from '@/expenses/models/Expense';
 import { useTranslation } from '@/i18n/useTranslation';
+import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
   expense: Expense | null | undefined;
@@ -31,6 +32,7 @@ function splitTag(description: string): { desc: string; tag: string } {
  */
 export function ExpenseDetailModal({ expense, visible, saving, onClose, onSave }: Props) {
   const { t } = useTranslation();
+  const theme = useTheme();
   const [draft, setDraft] = useState<NewExpense | null>(null);
   const [initialTag, setInitialTag] = useState('');
 
@@ -74,9 +76,9 @@ export function ExpenseDetailModal({ expense, visible, saving, onClose, onSave }
           accessibilityRole="button"
           accessibilityLabel={t('common_close')}
           onPress={onClose}
-          style={styles.closeBtn}
+          style={[styles.closeBtn, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
         >
-          <X size={22} color="#0F172A" />
+          <X size={22} color={theme.text} />
         </Pressable>
         {draft && (
           <QuickExpenseForm
@@ -102,7 +104,7 @@ const styles = StyleSheet.create({
   container: { width: '100%', minHeight: SHEET_MIN_H, gap: Spacing.two },
   closeBtn: {
     width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#FFFFFF', alignSelf: 'flex-end',
+    borderWidth: 1, alignSelf: 'flex-end',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
 });

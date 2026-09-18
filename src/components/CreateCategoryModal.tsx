@@ -26,8 +26,6 @@ export const EMOJI_PRESETS = [
   '🐰', '🦜', '🐟', '🩺', '🧘', '🎭', '🎸', '🏧',
   '✉️', '🧺',
 ];
-const EXPENSE_RED = '#F0524D';
-const INCOME_GREEN = '#5A9E4B';
 const EMOJI_ROWS = 3;
 const COLOR_PRESETS = [
   '#f97316', '#ef4444', '#ec4899', '#8b5cf6', '#3b82f6', '#0ea5e9', '#06b6d4',
@@ -123,9 +121,9 @@ export function CreateCategoryModal({ visible, saving, initial, kindPreset = 'GA
             accessibilityRole="button"
             accessibilityLabel={t('common_close')}
             onPress={onClose}
-            style={styles.closeBtn}
+            style={[styles.closeBtn, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
           >
-            <X size={22} color="#0F172A" />
+            <X size={22} color={theme.text} />
           </Pressable>
         </View>
         <Input label={t('categories_nameLabel')} value={label} onChangeText={setLabel} placeholder={t('categories_namePlaceholder')} maxLength={24} returnKeyType="done" style={styles.nameText} />
@@ -134,17 +132,17 @@ export function CreateCategoryModal({ visible, saving, initial, kindPreset = 'GA
             accessibilityRole="button"
             accessibilityLabel={t('categories_a11yKindExpense')}
             onPress={() => setKind('GASTO')}
-            style={[styles.kindHalf, kind === 'GASTO' && { backgroundColor: EXPENSE_RED }]}
+            style={[styles.kindHalf, kind === 'GASTO' && { backgroundColor: theme.expense }]}
           >
-            <Text variant="smallBold" style={{ color: kind === 'GASTO' ? '#FFFFFF' : theme.textSecondary }}>{t('categories_kindExpense')}</Text>
+            <Text variant="smallBold" style={{ color: kind === 'GASTO' ? theme.white : theme.textSecondary }}>{t('categories_kindExpense')}</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('categories_a11yKindIncome')}
             onPress={() => setKind('INGRESO')}
-            style={[styles.kindHalf, kind === 'INGRESO' && { backgroundColor: INCOME_GREEN }]}
+            style={[styles.kindHalf, kind === 'INGRESO' && { backgroundColor: theme.income }]}
           >
-            <Text variant="smallBold" style={{ color: kind === 'INGRESO' ? '#FFFFFF' : theme.textSecondary }}>{t('categories_kindIncome')}</Text>
+            <Text variant="smallBold" style={{ color: kind === 'INGRESO' ? theme.white : theme.textSecondary }}>{t('categories_kindIncome')}</Text>
           </Pressable>
         </View>
         <Text variant="small" color="textSecondary">{t('categories_iconLabel')}</Text>
@@ -191,16 +189,16 @@ export function CreateCategoryModal({ visible, saving, initial, kindPreset = 'GA
         </ScrollView>
         {(attempted && localError) && <Text variant="small" color="danger">{localError}</Text>}
         <View style={styles.footer}>
-          <View style={styles.footerSpacer} />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('categories_save')}
             onPress={handleSave}
             disabled={saving}
-            style={[styles.saveCircle, saving && { opacity: 0.6 }]}
+            style={[styles.saveCircle, { backgroundColor: theme.dark }, saving && { opacity: 0.6 }]}
           >
-            <Check size={22} color="#FFFFFF" strokeWidth={3} />
+            <Check size={22} color={theme.white} strokeWidth={3} />
           </Pressable>
+          <Text variant="smallBold" style={{ color: theme.text }}>{t('categories_save')}</Text>
         </View>
       </ScrollView>
   );
@@ -226,7 +224,7 @@ const styles = StyleSheet.create({
   giantTitle: { flex: 1, fontSize: 30, lineHeight: 38, fontWeight: '800', fontFamily: Fonts.sans },
   closeBtn: {
     width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
   nameText: { fontSize: 22, lineHeight: 28, fontWeight: '700', fontFamily: Fonts.sans },
@@ -239,9 +237,8 @@ const styles = StyleSheet.create({
   presetActive: { borderWidth: 2 },
   presetEmoji: { fontSize: 20 },
   colorBox: { width: 32, height: 32, borderRadius: 16, borderWidth: 1.5 },
-  footer: { flexDirection: 'row', alignItems: 'center' },
-  footerSpacer: { flex: 1 },
-  saveCircle: { width: 56, height: 56, borderRadius: 16, backgroundColor: '#2B2B2B', alignItems: 'center', justifyContent: 'center' },
+  footer: { alignItems: 'center', gap: Spacing.one },
+  saveCircle: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 });
 
 export default CreateCategoryModal;

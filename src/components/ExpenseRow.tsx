@@ -5,6 +5,7 @@ import { Trash2 } from 'lucide-react-native';
 import { ExpenseCard } from './ExpenseCard';
 import type { Expense } from '@/expenses/models/Expense';
 import { useTranslation } from '@/i18n/useTranslation';
+import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
   expense: Expense;
@@ -68,7 +69,6 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F0524D',
   },
 });
 
@@ -83,6 +83,7 @@ export function SwipeTrashAction({
   onPress: () => void;
 }) {
   const scale = dragX.interpolate({ inputRange: [-80, 0], outputRange: [1, 0.5], extrapolate: 'clamp' });
+  const theme = useTheme();
   return (
     <View style={styles.trashWrap}>
       <Animated.View style={{ transform: [{ scale }] }}>
@@ -90,9 +91,9 @@ export function SwipeTrashAction({
           accessibilityRole="button"
           accessibilityLabel={label}
           onPress={onPress}
-          style={({ pressed }) => [styles.trashCircle, pressed && { opacity: 0.8 }]}
+          style={({ pressed }) => [[styles.trashCircle, { backgroundColor: theme.danger }], pressed && { opacity: 0.8 }]}
         >
-          <Trash2 size={22} color="#FFFFFF" />
+          <Trash2 size={22} color={theme.white} />
         </Pressable>
       </Animated.View>
     </View>

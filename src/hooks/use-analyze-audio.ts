@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import { analyzeAudio, analyzeText, type Expense } from '@/services/expense-api';
+import { logApiError } from '@/utils/debug-log';
 
 type AnalyzeStatus = 'idle' | 'loading' | 'success' | 'error';
 
@@ -22,6 +23,7 @@ export function useAnalyzeAudio() {
         return result;
       } catch (e) {
         const msg = (e as Error).message ?? 'Error al analizar';
+        logApiError('useAnalyzeAudio.analyze', e);
         setError(msg);
         setStatus('error');
         throw e;
@@ -48,6 +50,7 @@ export function useAnalyzeAudio() {
         return result;
       } catch (e) {
         const msg = (e as Error).message ?? 'Error al analizar';
+        logApiError('useAnalyzeAudio.analyzeText', e, { textLength: text.length });
         setError(msg);
         setStatus('error');
         throw e;

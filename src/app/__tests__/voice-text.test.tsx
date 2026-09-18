@@ -73,6 +73,13 @@ describe('VoiceTextScreen (PoC transcripción)', () => {
     });
   });
 
+  it('muestra la bandera del idioma arriba sin badge offline/idioma', async () => {
+    const { getByText, queryByText } = renderScreen();
+    await waitFor(() => expect(getByText('🇲🇽')).toBeTruthy());
+    expect(queryByText(/Sin conexión/)).toBeNull();
+    expect(queryByText(/es-MX/)).toBeNull();
+  });
+
   it('muestra el placeholder y luego palabras separadas que se consolidan', async () => {
     const { __listeners } = speechMocks();
     const { getByText, queryByText } = renderScreen();

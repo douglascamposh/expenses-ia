@@ -4,7 +4,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Radius } from '@/constants/theme';
 import { Text } from './Text';
 
-export type ButtonVariant = 'primary' | 'ghost' | 'neutral' | 'danger' | 'dangerOutline';
+export type ButtonVariant = 'primary' | 'ghost' | 'neutral' | 'danger' | 'dangerOutline' | 'dark';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 type Props = Omit<PressableProps, 'style'> & {
@@ -46,17 +46,20 @@ export function Button({
   const variantStyle = (() => {
     switch (variant) {
       case 'primary':
-        return { bg: colors.primary, border: colors.primary, text: '#FFFFFF' };
+        return { bg: colors.primary, border: colors.primary, text: colors.white };
       case 'ghost':
         return { bg: 'transparent', border: colors.primary, text: colors.primary };
       case 'neutral':
         return { bg: colors.backgroundSelected, border: colors.border, text: colors.textSecondary };
       case 'danger':
-        return { bg: colors.danger, border: colors.danger, text: '#FFFFFF' };
+        return { bg: colors.danger, border: colors.danger, text: colors.white };
       case 'dangerOutline':
-        return { bg: 'transparent', border: '#FECACA', text: colors.danger };
+        return { bg: 'transparent', border: colors.dangerSoft, text: colors.danger };
+      case 'dark':
+        // Plomo oscuro del mockup (mismo que el check de guardado del formulario).
+        return { bg: colors.dark, border: colors.dark, text: colors.white };
       default:
-        return { bg: colors.primary, border: colors.primary, text: '#FFFFFF' };
+        return { bg: colors.primary, border: colors.primary, text: colors.white };
     }
   })();
 

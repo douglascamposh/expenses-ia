@@ -101,7 +101,9 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
+    lineHeight: 22,
     paddingVertical: 0,
+    textAlignVertical: 'center',
   },
   closeBtn: {
     width: 52,

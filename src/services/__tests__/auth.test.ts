@@ -8,6 +8,9 @@ import {
   getAuthToken,
 } from '../auth';
 
+// El logger de debug escribe en consola: silenciarlo aquí para no ensuciar la salida.
+jest.mock('@/utils/debug-log', () => ({ logApiError: jest.fn(), logApiWarn: jest.fn() }));
+
 const mockGetAuth = getAuth as jest.Mock;
 const mockSignIn = signInAnonymously as jest.Mock;
 const mockGetIdToken = getIdToken as jest.Mock;

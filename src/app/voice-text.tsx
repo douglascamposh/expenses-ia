@@ -12,12 +12,13 @@ import { useAnalyzeAudio } from '@/hooks/use-analyze-audio';
 import { useTranslation } from '@/i18n/useTranslation';
 import { isServiceUnavailable } from '@/services/expense-api';
 import { setVoiceTranscript } from '@/services/voice-draft';
-import { flagForRegion } from '@/services/voice-locale';
+import { flagForSpeech } from '@/services/voice-locale';
 import { getAllCategories, resolveCategoryId } from '@/expenses/categories/expenseCategories';
 import { isValidCurrency, isValidKind, isValidPaymentMethod, type NewExpense } from '@/expenses/models/Expense';
 import { validateExpenseCommand } from '@/expenses/services/ExpenseService';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setPendingQueue } from '@/store/expensesSlice';
+import { useTheme } from '@/hooks/use-theme';
 
 /**
  * PoC transcripción por micrófono (mockup texto): gradiente cálido,
@@ -27,12 +28,13 @@ import { setPendingQueue } from '@/store/expensesSlice';
 export default function VoiceTextScreen() {
   const router = useRouter();
   const { t, lang } = useTranslation();
+  const theme = useTheme();
   const dispatch = useAppDispatch();
   const defaultCurrency = useAppSelector((s) => s.settings.defaultCurrency);
-  const { status, transcript, offline, locale, error, start, stop, abort } = useSpeechTranscript(lang);
+  const { status, transcript, locale, error, start, stop, abort } = useSpeechTranscript(lang);
   const analyzer = useAnalyzeAudio();
   const [sendError, setSendError] = useState<string | null>(null);
-  const region = (locale.split('-')[1] ?? '').toUpperCase();
+  const flag = flagForSpeech(locale, lang);
 
   useEffect(() => {
     // PoC: auto-inicio al abrir (el gesto fue el mic del inicio).
@@ -118,7 +120,7 @@ export default function VoiceTextScreen() {
         <View style={styles.topRow}>
           <View style={styles.spacer} />
           <View style={styles.flagCircle}>
-            <Text style={styles.flag}>{flagForRegion(region)}</Text>
+            <Text style={styles.flag}>{flag}</Text>
           </View>
         </View>
         <ScrollView contentContainerStyle={styles.textWrap} showsVerticalScrollIndicator={false}>
@@ -132,9 +134,6 @@ export default function VoiceTextScreen() {
             </View>
           ) : (
             <Text style={[styles.transcript, styles.placeholder]}>{t('voicetext_hint')}</Text>
-          )}
-          {offline && transcript.length > 0 && (
-            <Text style={styles.offlineBadge}>{t('voicetext_offline')} · {locale}</Text>
           )}
           {hint && <Text style={styles.hint}>{hint}</Text>}
         </ScrollView>
@@ -153,7 +152,7 @@ export default function VoiceTextScreen() {
             accessibilityLabel={t('voicetext_a11yConfirm')}
             onPress={confirm}
             disabled={analyzer.isLoading}
-            style={[styles.confirmBtn, analyzer.isLoading && { opacity: 0.6 }]}
+            style={[styles.confirmBtn, { backgroundColor: theme.expense }, analyzer.isLoading && { opacity: 0.6 }]}
           >
             {analyzer.isLoading ? (
               <ActivityIndicator size="large" color="#FFFFFF" />
@@ -173,11 +172,11 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', alignItems: 'center' },
   spacer: { flex: 1 },
   flagCircle: {
-    width: 52, height: 52, borderRadius: 26, backgroundColor: '#FFFFFF',
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3,
   },
-  flag: { fontSize: 26 },
+  flag: { fontSize: 22 },
   textWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.six },
   transcript: {
     fontSize: 34, lineHeight: 44, fontWeight: '800', fontFamily: Fonts.sans,
@@ -189,11 +188,6 @@ const styles = StyleSheet.create({
     fontSize: 34, lineHeight: 44, fontWeight: '800', fontFamily: Fonts.sans,
     color: '#FFFFFF',
   },
-  offlineBadge: {
-    marginTop: Spacing.three, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.25)', color: '#FFFFFF',
-    fontSize: 13, fontWeight: '700', fontFamily: Fonts.sans, overflow: 'hidden',
-  },
   hint: {
     marginTop: Spacing.two, fontSize: 15, fontFamily: Fonts.sans,
     color: '#FFFFFF', textAlign: 'center', opacity: 0.9,
@@ -204,7 +198,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   confirmBtn: {
-    width: 84, height: 84, borderRadius: 42, backgroundColor: '#F0524D',
+    width: 84, height: 84, borderRadius: 42,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 8,
   },

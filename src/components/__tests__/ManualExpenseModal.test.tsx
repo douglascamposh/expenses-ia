@@ -13,7 +13,7 @@ describe('ManualExpenseModal (flujo mockup)', () => {
     const { getByPlaceholderText, getByLabelText, queryByText } = render(
       <ManualExpenseModal visible saving={false} onClose={() => {}} onSave={() => {}} />,
     );
-    expect(getByPlaceholderText('Descripción')).toBeTruthy();
+    expect(getByPlaceholderText('En qué gasté')).toBeTruthy();
     expect(getByPlaceholderText('Monto')).toBeTruthy();
     expect(getByLabelText('Guardar')).toBeTruthy();
     expect(queryByText('Cambiar moneda')).toBeNull();
@@ -25,7 +25,7 @@ describe('ManualExpenseModal (flujo mockup)', () => {
     const { getByPlaceholderText, getByLabelText } = render(
       <ManualExpenseModal visible saving={false} onClose={() => {}} onSave={onSave} />,
     );
-    fireEvent.changeText(getByPlaceholderText('Descripción'), 'Compra en Amazon');
+    fireEvent.changeText(getByPlaceholderText('En qué gasté'), 'Compra en Amazon');
     fireEvent.changeText(getByPlaceholderText('Monto'), '250');
     // Elegir la categoría del sistema desde el carrusel
     fireEvent.press(getByLabelText('Otros'));
@@ -46,7 +46,7 @@ describe('ManualExpenseModal (flujo mockup)', () => {
     const { getByText, getByPlaceholderText, getByLabelText } = render(
       <ManualExpenseModal visible saving={false} onClose={() => {}} onSave={onSave} />,
     );
-    fireEvent.changeText(getByPlaceholderText('Descripción'), 'Sueldo');
+    fireEvent.changeText(getByPlaceholderText('En qué gasté'), 'Sueldo');
     fireEvent.changeText(getByPlaceholderText('Monto'), '1000');
     fireEvent.press(getByLabelText('Marcar como ingreso'));
     fireEvent.press(getByLabelText('Otros'));
@@ -61,7 +61,7 @@ describe('ManualExpenseModal (flujo mockup)', () => {
     const { getByText, getByPlaceholderText, getByLabelText } = render(
       <ManualExpenseModal visible saving={false} onClose={() => {}} onSave={onSave} />,
     );
-    fireEvent.changeText(getByPlaceholderText('Descripción'), 'Algo');
+    fireEvent.changeText(getByPlaceholderText('En qué gasté'), 'Algo');
     fireEvent.changeText(getByPlaceholderText('Monto'), '10');
     fireEvent.press(getByLabelText('Guardar'));
     await waitFor(() => expect(getByText('La transacción requiere categoría')).toBeTruthy());
@@ -73,7 +73,7 @@ describe('ManualExpenseModal (flujo mockup)', () => {
     const { getByText, getByPlaceholderText, getByLabelText } = render(
       <ManualExpenseModal visible saving={false} onClose={() => {}} onSave={onSave} />,
     );
-    fireEvent.changeText(getByPlaceholderText('Descripción'), 'Algo');
+    fireEvent.changeText(getByPlaceholderText('En qué gasté'), 'Algo');
     fireEvent.press(getByLabelText('Guardar'));
     await waitFor(() => expect(getByText('Ingresa un monto mayor a 0')).toBeTruthy());
     expect(onSave).not.toHaveBeenCalled();
@@ -121,7 +121,7 @@ describe('ManualExpenseModal (flujo mockup)', () => {
       <ManualExpenseModal visible saving={false} onClose={() => {}} onSave={onSave} defaultCurrency="PEN" />,
     );
     expect(queryByPlaceholderText('Etiqueta')).toBeNull();
-    fireEvent.changeText(getByPlaceholderText('Descripción'), 'Menú');
+    fireEvent.changeText(getByPlaceholderText('En qué gasté'), 'Menú');
     fireEvent.changeText(getByPlaceholderText('Monto'), '50');
     fireEvent.press(getByLabelText('Otros'));
     fireEvent.press(getByLabelText('Guardar'));
@@ -145,24 +145,24 @@ describe('ManualExpenseModal (flujo mockup)', () => {
     const { getByPlaceholderText, rerender } = render(
       <ManualExpenseModal visible saving={false} onClose={() => {}} onSave={() => {}} resetKey={1} />,
     );
-    fireEvent.changeText(getByPlaceholderText('Descripción'), 'Taxi al centro');
+    fireEvent.changeText(getByPlaceholderText('En qué gasté'), 'Taxi al centro');
     rerender(
       <ManualExpenseModal visible={false} saving={false} onClose={() => {}} onSave={() => {}} resetKey={1} />,
     );
     rerender(
       <ManualExpenseModal visible saving={false} onClose={() => {}} onSave={() => {}} resetKey={1} />,
     );
-    expect(getByPlaceholderText('Descripción').props.value).toBe('Taxi al centro');
+    expect(getByPlaceholderText('En qué gasté').props.value).toBe('Taxi al centro');
   });
 
   it('reinicia el borrador con un resetKey nuevo', () => {
     const { getByPlaceholderText, rerender } = render(
       <ManualExpenseModal visible saving={false} onClose={() => {}} onSave={() => {}} resetKey={1} />,
     );
-    fireEvent.changeText(getByPlaceholderText('Descripción'), 'Taxi al centro');
+    fireEvent.changeText(getByPlaceholderText('En qué gasté'), 'Taxi al centro');
     rerender(
       <ManualExpenseModal visible saving={false} onClose={() => {}} onSave={() => {}} resetKey={2} />,
     );
-    expect(getByPlaceholderText('Descripción').props.value).toBe('');
+    expect(getByPlaceholderText('En qué gasté').props.value).toBe('');
   });
 });

@@ -1,5 +1,8 @@
 import { analyzeText, normalizeAnalyzeResponse, AnalyzeError, ANALYZE_TEXT_ENDPOINT, isServiceUnavailable } from '../expense-api';
 
+// Silencia el logger de debug (los casos de error lo disparan a propósito).
+jest.mock('@/utils/debug-log', () => ({ logApiError: jest.fn(), logApiWarn: jest.fn() }));
+
 const realFetch = globalThis.fetch;
 
 function mockFetchOnce(json: unknown, ok = true, status = 200) {

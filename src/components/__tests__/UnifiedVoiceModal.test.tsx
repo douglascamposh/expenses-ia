@@ -20,6 +20,7 @@ function renderResults(props = {}) {
       onCancelAnalyzing={() => {}}
       onSaveOne={() => {}}
       onSaveAll={() => {}}
+      onDeleteOne={() => {}}
       onDismissResults={() => {}}
       saving={false}
       {...props}
@@ -28,39 +29,58 @@ function renderResults(props = {}) {
 }
 
 describe('UnifiedVoiceModal resultados (pantalla completa)', () => {
-  it('muestra todos los detectados con scroll y Save all', () => {
-    const { getByText } = renderResults();
+  it('muestra todos los detectados con scroll y Guardar todo', () => {
+    const { getByText, getByDisplayValue } = renderResults();
     expect(getByText('3 gastos detectados')).toBeTruthy();
-    expect(getByText('Almuerzo')).toBeTruthy();
-    expect(getByText('Bus')).toBeTruthy();
-    expect(getByText('Cena')).toBeTruthy();
-    expect(getByText('Save all (3)')).toBeTruthy();
+    expect(getByDisplayValue('Almuerzo')).toBeTruthy();
+    expect(getByDisplayValue('Bus')).toBeTruthy();
+    expect(getByDisplayValue('Cena')).toBeTruthy();
+    expect(getByText('Guardar todo (3)')).toBeTruthy();
   });
 
   it('editar un borrador y guardar llama onSaveOne', () => {
     const onSaveOne = jest.fn();
-    const { getAllByText, getByDisplayValue } = renderResults({ onSaveOne });
-    fireEvent.press(getAllByText('Edit')[0]);
+    const { getAllByLabelText, getByDisplayValue } = renderResults({ onSaveOne });
     fireEvent.changeText(getByDisplayValue('Almuerzo'), 'Almuerzo editado');
-    fireEvent.press(getAllByText('Save')[0]);
+    fireEvent.press(getAllByLabelText('Guardar')[0]);
     expect(onSaveOne).toHaveBeenCalledTimes(1);
     expect(onSaveOne.mock.calls[0][0]).toBe(0);
     expect(onSaveOne.mock.calls[0][1]).toMatchObject({ description: 'Almuerzo editado' });
   });
 
-  it('Save all envía todos y Cancel descarta', () => {
+  it('Guardar todo envía todos y la X descarta', () => {
     const onSaveAll = jest.fn();
     const onDismissResults = jest.fn();
-    const { getByText } = renderResults({ onSaveAll, onDismissResults });
-    fireEvent.press(getByText('Save all (3)'));
+    const { getByText, getByLabelText } = renderResults({ onSaveAll, onDismissResults });
+    fireEvent.press(getByText('Guardar todo (3)'));
     expect(onSaveAll).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ description: 'Almuerzo' })]));
-    fireEvent.press(getByText('Cancel'));
+    fireEvent.press(getByLabelText('Cerrar resultados'));
     expect(onDismissResults).toHaveBeenCalledTimes(1);
   });
 
-  it('un solo gasto no muestra Save all', () => {
+  it('un solo gasto no muestra Guardar todo', () => {
     const { queryByText } = renderResults({ expenses: [drafts[0]] } as never);
-    expect(queryByText(/Save all/)).toBeNull();
+    expect(queryByText(/Guardar todo/)).toBeNull();
+  });
+
+  it('la X pide confirmación y Eliminar quita el item', () => {
+    const onDeleteOne = jest.fn();
+    const { getAllByLabelText, getByText, queryByText } = renderResults({ onDeleteOne });
+    fireEvent.press(getAllByLabelText('Eliminar Almuerzo')[0]);
+    expect(getByText('¿Eliminar?')).toBeTruthy();
+    fireEvent.press(getByText('Eliminar'));
+    expect(onDeleteOne).toHaveBeenCalledTimes(1);
+    expect(onDeleteOne).toHaveBeenCalledWith(0);
+    expect(queryByText('¿Eliminar?')).toBeNull();
+  });
+
+  it('Cancelar en la confirmación no quita el item', () => {
+    const onDeleteOne = jest.fn();
+    const { getAllByLabelText, getByText, queryByText } = renderResults({ onDeleteOne });
+    fireEvent.press(getAllByLabelText('Eliminar Bus')[0]);
+    fireEvent.press(getByText('Cancelar'));
+    expect(onDeleteOne).not.toHaveBeenCalled();
+    expect(queryByText('¿Eliminar?')).toBeNull();
   });
 
   it('editor sin monedas: carrusel cambia categoría y fecha abre selector', () => {
@@ -70,18 +90,17 @@ describe('UnifiedVoiceModal resultados (pantalla completa)', () => {
     ] as never);
     try {
       const onSaveOne = jest.fn();
-      const { getAllByText, getByLabelText, getByText, queryByText } = renderResults({ onSaveOne });
-      fireEvent.press(getAllByText('Edit')[0]);
+      const { getAllByLabelText, getByLabelText, getByText, queryByText } = renderResults({ onSaveOne });
       // Sin grilla de monedas (usa la del sistema)
       expect(queryByText('USD')).toBeNull();
       expect(queryByText('EUR')).toBeNull();
-      // Carrusel: cambiar a Transporte y guardar
-      fireEvent.press(getByLabelText('Transport'));
+      // Carrusel del primer borrador: cambiar a Transporte y guardar
+      fireEvent.press(getAllByLabelText('Transport')[0]);
     // Fecha abre el selector, elige un día y acepta
-    fireEvent.press(getByLabelText('Elegir fecha del gasto'));
+    fireEvent.press(getAllByLabelText('Cambiar fecha')[0]);
     fireEvent.press(getByLabelText('Elegir 2026-09-08'));
     fireEvent.press(getByText('Aceptar'));
-    fireEvent.press(getAllByText('Save')[0]);
+    fireEvent.press(getAllByLabelText('Guardar')[0]);
       expect(onSaveOne).toHaveBeenCalledTimes(1);
       expect(onSaveOne.mock.calls[0][1]).toMatchObject({ category: 'TRANSPORT', date: '2026-09-08' });
     } finally {

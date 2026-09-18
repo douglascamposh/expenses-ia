@@ -55,9 +55,9 @@ export function CurrencyModal({ visible, selected, onClose, onSelect }: Props) {
             accessibilityRole="button"
             accessibilityLabel={t('common_close')}
             onPress={onClose}
-            style={styles.closeBtn}
+            style={[styles.closeBtn, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
           >
-            <X size={22} color="#0F172A" />
+            <X size={22} color={theme.text} />
           </Pressable>
         </View>
         <View style={[styles.searchBox, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   giantTitle: { flex: 1, fontSize: 30, lineHeight: 38, fontWeight: '800', fontFamily: Fonts.sans },
   closeBtn: {
     width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
   searchBox: {
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  searchInput: { flex: 1, fontSize: 16, fontFamily: Fonts.sans, paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 16, lineHeight: 22, fontFamily: Fonts.sans, paddingVertical: 2 },
   list: { maxHeight: 360, width: '100%' },
   listContent: { gap: 4, paddingBottom: Spacing.two },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12 },

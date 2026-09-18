@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { Banknote, Check, ChevronDown, CreditCard, Plus } from 'lucide-react-native';
+import { useRef, useState } from 'react';
+import { LayoutAnimation, Platform, Pressable, ScrollView, StyleSheet, TextInput, UIManager, View } from 'react-native';
+import { Banknote, Check, ChevronDown, CreditCard, Plus, X } from 'lucide-react-native';
 import { Text } from '@/components/ui';
 import { CreateCategoryModal } from '@/components/CreateCategoryModal';
 import { RecurrenceModal } from '@/components/RecurrenceModal';
@@ -14,8 +14,10 @@ import type { StringKey } from '@/i18n/translations';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useTheme } from '@/hooks/use-theme';
 
-const INCOME_GREEN = '#5A9E4B';
-const EXPENSE_RED = '#F0524D';
+// LayoutAnimation en Android requiere flag experimental.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 /** Etiqueta del chip según recurrencia del borrador. */
 export const RECUR_LABEL_KEYS: Record<Frequency, StringKey> = {
@@ -41,20 +43,43 @@ type Props = {
   allowCategory?: string | null;
   /** Estira el form y empuja la fila de pago al fondo (detalle estilo mockup). */
   expandBottom?: boolean;
+  /** Versión compacta para tarjetas de revisión (desc/monto más pequeños). */
+  compact?: boolean;
+  /** Lleva el carrusel a la categoría seleccionada al montar (default true). */
+  autoScrollCategory?: boolean;
+  /** Si se pasa, muestra X al final de la fila fecha/recurrencia (quitar borrador). */
+  onDeletePress?: () => void;
+  /** Label accesible de la X (default: "Eliminar {desc}"). */
+  deleteA11yLabel?: string;
 };
 
 /** Formulario rápido estilo mockup: descripción/monto gigantes, carrusel, pago, fecha. */
-export function QuickExpenseForm({ value, onChange, defaultCurrency, onSave, initialTag = '', allowCategory = null, expandBottom = false }: Props) {
+export function QuickExpenseForm({ value, onChange, defaultCurrency, onSave, initialTag = '', allowCategory = null, expandBottom = false, compact = false, autoScrollCategory = true, onDeletePress, deleteA11yLabel }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
   const [dateOpen, setDateOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [recurOpen, setRecurOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: 'error' | 'info' } | null>(null);
+  const carouselRef = useRef<ScrollView>(null);
+  const didAutoScrollRef = useRef(false);
+
+  /** Seleccionar categoría con transición fluida (la pill se mueve al frente). */
+  const selectCategory = (id: NewExpense['category']) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    onChange({ category: id });
+  };
+
+  /** Al montar, muestra la categoría ya seleccionada sin pedir scroll manual. Solo una vez. */
+  const maybeAutoScroll = (x: number) => {
+    if (!autoScrollCategory || didAutoScrollRef.current) return;
+    didAutoScrollRef.current = true;
+    carouselRef.current?.scrollTo({ x: Math.max(0, x - 12), animated: false });
+  };
 
   const kind: EntryKind = value.kind ?? 'EXPENSE';
   const recurrence: Frequency = value.recurrence ?? 'ONCE';
-  const kindColor = kind === 'INCOME' ? INCOME_GREEN : EXPENSE_RED;
+  const kindColor = kind === 'INCOME' ? theme.income : theme.expense;
   const symbol = getCurrencySymbol(defaultCurrency);
   const categories = getAllCategories().filter(
     (c) => (kind === 'INCOME' ? c.kind === 'INGRESO' : c.kind === 'GASTO') || String(c.id) === String(SYSTEM_CATEGORY.id),
@@ -66,6 +91,11 @@ export function QuickExpenseForm({ value, onChange, defaultCurrency, onSave, ini
       : [];
   const visibleCategories = [...categories, ...allowedExtra];
   const selectedId = String(value.category ?? '');
+  // La seleccionada va primera, junto al +: siempre visible sin scroll inicial.
+  const orderedCategories = [
+    ...visibleCategories.filter((c) => String(c.id) === selectedId),
+    ...visibleCategories.filter((c) => String(c.id) !== selectedId),
+  ];
   const todayStr = new Date().toISOString().split('T')[0];
   const isToday = value.date === todayStr;
 
@@ -123,6 +153,16 @@ export function QuickExpenseForm({ value, onChange, defaultCurrency, onSave, ini
           <Text variant="smallBold" style={{ color: theme.textSecondary }}>{t(RECUR_LABEL_KEYS[recurrence])}</Text>
           <ChevronDown size={14} color={theme.textSecondary} />
         </Pressable>
+        {onDeletePress && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={deleteA11yLabel ?? ((value.description ?? '').trim() ? t('expenseRow_delete', { desc: (value.description ?? '').trim() }) : t('common_delete'))}
+            onPress={onDeletePress}
+            style={[styles.deleteCircle, { marginLeft: 'auto', borderColor: '#FECACA', backgroundColor: theme.backgroundElement }]}
+          >
+            <X size={18} color={theme.danger} />
+          </Pressable>
+        )}
       </View>
 
       <TextInput
@@ -130,7 +170,7 @@ export function QuickExpenseForm({ value, onChange, defaultCurrency, onSave, ini
         onChangeText={(description) => onChange({ description })}
         placeholder={t('quick_descPh')}
         placeholderTextColor="#B0B0B0"
-        style={[styles.ghost, { color: theme.text }]}
+        style={[styles.ghost, compact && styles.ghostCompact, { color: theme.text }]}
         maxLength={60}
         returnKeyType="next"
       />
@@ -140,7 +180,7 @@ export function QuickExpenseForm({ value, onChange, defaultCurrency, onSave, ini
             accessibilityRole="button"
             accessibilityLabel={t('quick_a11yKindExpense')}
             onPress={() => onChange({ kind: 'EXPENSE' })}
-            style={[styles.kindHalf, kind === 'EXPENSE' && { backgroundColor: EXPENSE_RED }]}
+            style={[styles.kindHalf, kind === 'EXPENSE' && { backgroundColor: theme.expense }]}
           >
             <Text style={[styles.kindSign, { color: kind === 'EXPENSE' ? '#FFFFFF' : theme.text }]}>-</Text>
           </Pressable>
@@ -148,23 +188,23 @@ export function QuickExpenseForm({ value, onChange, defaultCurrency, onSave, ini
             accessibilityRole="button"
             accessibilityLabel={t('quick_a11yKindIncome')}
             onPress={() => onChange({ kind: 'INCOME' })}
-            style={[styles.kindHalf, kind === 'INCOME' && { backgroundColor: INCOME_GREEN }]}
+            style={[styles.kindHalf, kind === 'INCOME' && { backgroundColor: theme.income }]}
           >
             <Text style={[styles.kindSign, { color: kind === 'INCOME' ? '#FFFFFF' : theme.text }]}>+</Text>
           </Pressable>
         </View>
-        <Text style={[styles.symbol, { color: (value.amount ?? 0) > 0 ? kindColor : '#B0B0B0' }]}>{symbol}</Text>
+        <Text style={[styles.symbol, compact && styles.symbolCompact, { color: (value.amount ?? 0) > 0 ? kindColor : '#B0B0B0' }]}>{symbol}</Text>
         <TextInput
           value={(value.amount ?? 0) > 0 ? String(value.amount) : ''}
           onChangeText={(raw) => onChange({ amount: parseFloat(raw.replace(',', '.')) || 0 })}
           placeholder={t('quick_amountPh')}
           placeholderTextColor="#B0B0B0"
           keyboardType="numeric"
-          style={[styles.amount, { color: (value.amount ?? 0) > 0 ? kindColor : '#B0B0B0' }]}
+          style={[styles.amount, compact && styles.amountCompact, { color: (value.amount ?? 0) > 0 ? kindColor : '#B0B0B0' }]}
         />
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+      <ScrollView ref={carouselRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('quick_a11yAddCategory')}
@@ -173,7 +213,7 @@ export function QuickExpenseForm({ value, onChange, defaultCurrency, onSave, ini
         >
           <Plus size={22} color={theme.text} />
         </Pressable>
-        {visibleCategories.map((c) => {
+        {orderedCategories.map((c) => {
           const active = String(c.id) === selectedId;
           return (
             <Pressable
@@ -181,7 +221,8 @@ export function QuickExpenseForm({ value, onChange, defaultCurrency, onSave, ini
               accessibilityRole="button"
               accessibilityLabel={c.label}
               accessibilityState={{ selected: active }}
-              onPress={() => onChange({ category: c.id as NewExpense['category'] })}
+              onPress={() => selectCategory(c.id as NewExpense['category'])}
+              onLayout={active ? (e) => maybeAutoScroll(e.nativeEvent.layout.x) : undefined}
               style={[
                 styles.catPill,
                 { borderColor: active ? theme.text : theme.border, backgroundColor: theme.backgroundElement },
@@ -214,7 +255,7 @@ export function QuickExpenseForm({ value, onChange, defaultCurrency, onSave, ini
           accessibilityRole="button"
           accessibilityLabel={t('quick_a11ySave')}
           onPress={handleSave}
-          style={styles.saveCircle}
+          style={[styles.saveCircle, { backgroundColor: theme.dark }]}
         >
           <Check size={22} color="#FFFFFF" strokeWidth={3} />
         </Pressable>
@@ -272,20 +313,24 @@ const styles = StyleSheet.create({
   spacer: { flex: 1, minHeight: 0 },
   scrollGrow: { flexGrow: 1, paddingBottom: Spacing.two },
   scrollContent: { gap: Spacing.three },
-  chipsRow: { flexDirection: 'row', gap: 8 },
+  chipsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  deleteCircle: { width: 34, height: 34, borderRadius: 17, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   miniChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
   ghost: { fontSize: 30, lineHeight: 38, fontWeight: '800', fontFamily: Fonts.sans, paddingVertical: 0 },
+  ghostCompact: { fontSize: 20, lineHeight: 26 },
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   kindToggle: { flexDirection: 'row', borderWidth: 1.5, borderRadius: 999, padding: 3, gap: 2 },
   kindHalf: { minWidth: 40, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   kindSign: { fontSize: 16, fontWeight: '800', fontFamily: Fonts.sans, lineHeight: 20 },
   symbol: { fontSize: 30, lineHeight: 38, fontWeight: '800', fontFamily: Fonts.sans },
+  symbolCompact: { fontSize: 20, lineHeight: 26 },
   amount: { flex: 1, minWidth: 0, fontSize: 34, lineHeight: 42, fontWeight: '800', fontFamily: Fonts.sans, paddingVertical: 0 },
+  amountCompact: { fontSize: 22, lineHeight: 28 },
   carousel: { gap: 10, paddingVertical: 4, alignItems: 'center' },
   addCircle: { width: 52, height: 52, borderRadius: 26, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   catPill: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 999, borderWidth: 1.5, maxWidth: 220 },
   catEmoji: { fontSize: 20 },
   payRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   payBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16, borderWidth: 1.5 },
-  saveCircle: { width: 56, height: 56, borderRadius: 16, backgroundColor: '#2B2B2B', alignItems: 'center', justifyContent: 'center' },
+  saveCircle: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 });

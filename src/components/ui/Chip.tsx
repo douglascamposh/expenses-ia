@@ -27,7 +27,7 @@ export function Chip({ label, icon, selected, onPress, size = 'md' }: Props) {
           paddingVertical: isSm ? 6 : 8,
           borderRadius: isSm ? Radius.lg : Radius.full,
           borderColor: selected ? colors.primary : colors.border,
-          backgroundColor: selected ? colors.primary + '1A' : '#FFFFFF',
+          backgroundColor: selected ? colors.primary + '1A' : colors.backgroundElement,
           opacity: pressed ? 0.85 : 1,
         },
       ]}

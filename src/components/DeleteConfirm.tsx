@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui';
 import { AlertModal } from '@/components/ui/Modal';
 import { useTranslation } from '@/i18n/useTranslation';
+import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
   visible: boolean;
@@ -24,10 +25,11 @@ export function DeleteConfirm({
   cancelLabel,
 }: Props) {
   const { t } = useTranslation();
+  const theme = useTheme();
   return (
     <AlertModal
       visible={visible}
-      icon={<View style={styles.iconWrap}><Text style={styles.icon}>🗑</Text></View>}
+      icon={<View style={[styles.iconWrap, { backgroundColor: theme.dangerBg }]}><Text style={styles.icon}>🗑</Text></View>}
       title={title ?? t('deleteConfirm_title')}
       description={description ?? t('deleteConfirm_desc')}
       primaryLabel={confirmLabel ?? t('deleteConfirm_delete')}
@@ -41,6 +43,6 @@ export function DeleteConfirm({
 }
 
 const styles = StyleSheet.create({
-  iconWrap: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
+  iconWrap: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   icon: { fontSize: 20 },
 });

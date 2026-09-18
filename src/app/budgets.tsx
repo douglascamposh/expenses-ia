@@ -127,7 +127,7 @@ export default function BudgetsScreen() {
             <Switch
               value={alertsEnabled}
               onValueChange={(v) => void handleToggleAlerts(v)}
-              trackColor={{ false: theme.border, true: '#F0524D' }}
+              trackColor={{ false: theme.border, true: theme.expense }}
               thumbColor="#FFFFFF"
               testID="budget-alerts-toggle"
             />

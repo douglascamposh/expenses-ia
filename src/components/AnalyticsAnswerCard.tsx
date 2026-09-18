@@ -5,6 +5,7 @@ import { Spacing } from '@/constants/theme';
 import { formatCurrency } from '@/expenses/utils/format';
 import type { Currency } from '@/expenses/models/Expense';
 import type { AnalyticsAnswer } from '@/store/expensesSlice';
+import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
   answer: AnalyticsAnswer;
@@ -16,6 +17,7 @@ type Props = {
  * La lista de gastos que la componen se muestra debajo, como siempre.
  */
 export function AnalyticsAnswerCard({ answer, compact = false }: Props) {
+  const theme = useTheme();
   if (!answer) return null;
   const isMax = answer.kind === 'max';
   const Icon = isMax ? Trophy : Calculator;
@@ -25,9 +27,9 @@ export function AnalyticsAnswerCard({ answer, compact = false }: Props) {
     : [answer.categoryLabel, `${answer.count} gasto${answer.count === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
 
   return (
-    <View style={[styles.card, compact && styles.compact]}>
-      <View style={[styles.iconBox, isMax && styles.iconGold]}>
-        <Icon size={20} color={isMax ? '#B45309' : '#2F80FF'} />
+    <View style={[styles.card, compact && styles.compact, { borderColor: theme.infoBorder, backgroundColor: theme.infoBg }]}>
+      <View style={[styles.iconBox, { backgroundColor: theme.infoDeep }, isMax && { backgroundColor: theme.goldBg }]}>
+        <Icon size={20} color={isMax ? theme.gold : theme.info} />
       </View>
       <View style={styles.meta}>
         <Text variant="small" color="textSecondary">{title}</Text>
@@ -50,13 +52,10 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
-    backgroundColor: '#EFF6FF',
     padding: Spacing.three,
   },
   compact: { padding: Spacing.two },
-  iconBox: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#DBEAFE' },
-  iconGold: { backgroundColor: '#FEF3C7' },
+  iconBox: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   meta: { flex: 1, gap: 2 },
   value: { fontSize: 24 },
 });

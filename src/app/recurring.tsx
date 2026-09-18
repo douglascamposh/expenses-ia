@@ -143,7 +143,7 @@ export default function RecurringScreen() {
                         {r.amount} · {t(RECUR_LABEL_KEYS[r.frequency])}{next ? ` · ${next}` : ''}
                       </Text>
                     </View>
-                    <View style={[styles.kindDot, { backgroundColor: r.kind === 'INCOME' ? '#5A9E4B' : '#F0524D' }]} />
+                    <View style={[styles.kindDot, { backgroundColor: r.kind === 'INCOME' ? theme.income : theme.expense }]} />
                   </Pressable>
                   {expanded && (
                     <View style={styles.editor}>
@@ -158,9 +158,9 @@ export default function RecurringScreen() {
                         accessibilityRole="button"
                         accessibilityLabel={t('recurring_a11ySave')}
                         onPress={() => saveAmount(r.id)}
-                        style={styles.saveCircle}
+                        style={[styles.saveCircle, { backgroundColor: theme.dark }]}
                       >
-                        <Check size={22} color="#FFFFFF" strokeWidth={3} />
+                        <Check size={22} color={theme.white} strokeWidth={3} />
                       </Pressable>
                       <Pressable
                         accessibilityRole="button"
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   kindDot: { width: 12, height: 12, borderRadius: 6 },
   editor: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   amountInput: { flex: 1, borderWidth: 1.5, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, fontSize: 18, fontWeight: '700', fontFamily: Fonts.sans },
-  saveCircle: { width: 52, height: 52, borderRadius: 16, backgroundColor: '#2B2B2B', alignItems: 'center', justifyContent: 'center' },
+  saveCircle: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   iconBtn: { width: 52, height: 52, borderRadius: 16, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   empty: { borderRadius: 16, padding: Spacing.four, alignItems: 'center', gap: Spacing.two, borderWidth: 1 },
 });

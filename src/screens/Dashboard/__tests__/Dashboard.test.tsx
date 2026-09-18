@@ -76,12 +76,12 @@ describe('Dashboard', () => {
   it('renders greeting and empty state', async () => {
     const { getByText } = renderWithStore();
     // fetchExpenses corre al montar; esperar a que SQLite mock devuelva []
-    await waitFor(() => expect(getByText(/No expenses yet/)).toBeTruthy());
+    await waitFor(() => expect(getByText(/Sin gastos todavía/)).toBeTruthy());
   });
 
   it('shows CTA when empty', async () => {
     const { getByText } = renderWithStore();
-    await waitFor(() => expect(getByText(/Start tracking/)).toBeTruthy());
+    await waitFor(() => expect(getByText(/Empieza a registrar/)).toBeTruthy());
   });
 
   it('muestra la lista unificada sin duplicar (solo gasto, sin barra)', async () => {
@@ -112,7 +112,7 @@ describe('Dashboard', () => {
       },
     ]);
     const { getByLabelText, getByTestId, getByText, queryByText } = renderWithStore();
-    await waitFor(() => expect(getByText(/No expenses yet/)).toBeTruthy());
+    await waitFor(() => expect(getByText(/Sin gastos todavía/)).toBeTruthy());
     fireEvent.press(getByLabelText('Buscar gastos'));
     const input = getByTestId('home-search-input');
     fireEvent.changeText(input, 'almuerzo');
@@ -120,7 +120,7 @@ describe('Dashboard', () => {
     await waitFor(() => expect(getByText('Almuerzo')).toBeTruthy());
     // X limpia y cierra sin navegar
     fireEvent.press(getByTestId('home-search-close'));
-    await waitFor(() => expect(getByText(/No expenses yet/)).toBeTruthy());
+    await waitFor(() => expect(getByText(/Sin gastos todavía/)).toBeTruthy());
     expect(mockPush).not.toHaveBeenCalledWith(expect.stringContaining('/explore'));
   });
 
@@ -169,7 +169,7 @@ describe('Dashboard', () => {
     // Una para el fetch al montar, otra para el cálculo del thunk
     expenseRepository.getAll.mockResolvedValueOnce(fixture).mockResolvedValueOnce(fixture);
     const { getByLabelText, getByTestId, getByText } = renderWithStore();
-    await waitFor(() => expect(getByText(/No expenses yet/)).toBeTruthy());
+    await waitFor(() => expect(getByText(/Sin gastos todavía/)).toBeTruthy());
     fireEvent.press(getByLabelText('Buscar gastos'));
     const input = getByTestId('home-search-input');
     fireEvent.changeText(input, 'cuánto gasté en total los últimos 12 meses');
@@ -189,7 +189,7 @@ describe('Dashboard', () => {
       })),
     );
     const { getByLabelText, getByTestId, getByText } = renderWithStore();
-    await waitFor(() => expect(getByText(/No expenses yet/)).toBeTruthy());
+    await waitFor(() => expect(getByText(/Sin gastos todavía/)).toBeTruthy());
     fireEvent.press(getByLabelText('Buscar gastos'));
     fireEvent.changeText(getByTestId('home-search-input'), 'almuerzo');
     await waitFor(() => expect(getByText('Almuerzo 5')).toBeTruthy());
@@ -199,7 +199,7 @@ describe('Dashboard', () => {
 
   it('tap en la fecha alterna la tira de meses (primer filtro)', async () => {
     const { getByLabelText, getByText, queryByTestId } = renderWithStore();
-    await waitFor(() => expect(getByText(/No expenses yet/)).toBeTruthy());
+    await waitFor(() => expect(getByText(/Sin gastos todavía/)).toBeTruthy());
     const now = new Date();
     const pillId = `month-pill-${now.getMonth() + 1}`;
     // Cerrada por defecto
@@ -282,7 +282,7 @@ describe('Dashboard', () => {
 
   it('el hero es estático y no navega fuera del inicio', async () => {
     const { getByLabelText, getByText } = renderWithStore();
-    await waitFor(() => expect(getByText(/No expenses yet/)).toBeTruthy());
+    await waitFor(() => expect(getByText(/Sin gastos todavía/)).toBeTruthy());
     fireEvent.press(getByLabelText('Ver gastos'));
     expect(mockPush).not.toHaveBeenCalled();
   });
@@ -307,11 +307,11 @@ describe('Dashboard', () => {
 
   it('botón + abre el modal de alta manual', async () => {
     const { getByText, getByPlaceholderText, getByLabelText, queryAllByLabelText } = renderWithStore();
-    await waitFor(() => expect(getByText(/No expenses yet/)).toBeTruthy());
+    await waitFor(() => expect(getByText(/Sin gastos todavía/)).toBeTruthy());
     // Solo el + de la píldora flotante (el header solo lleva Settings)
     expect(queryAllByLabelText('Agregar gasto manual')).toHaveLength(1);
     fireEvent.press(queryAllByLabelText('Agregar gasto manual')[0]);
-    await waitFor(() => expect(getByPlaceholderText('Descripción')).toBeTruthy());
+    await waitFor(() => expect(getByPlaceholderText('En qué gasté')).toBeTruthy());
     expect(getByLabelText('Guardar')).toBeTruthy();
   });
 

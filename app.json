@@ -39,6 +39,14 @@
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
       [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "dynamic"
+          }
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
@@ -56,7 +64,8 @@
       "expo-asset",
       "expo-sqlite",
       "expo-localization",
-      "expo-speech-recognition"
+      "expo-speech-recognition",
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true,
