@@ -37,12 +37,44 @@ export const fetchCategories = createAsyncThunk('categories/fetch', async () => 
   return list;
 });
 
+/** Estado previo para no vaciar nada si la re-lectura falla tras mutar. */
+function prevCustom(getState: unknown): CategoryConfig[] {
+  return (getState as { categories?: { custom?: CategoryConfig[] } })?.categories?.custom ?? [];
+}
+
+/**
+ * Re-lee tras mutar sin perder datos: si getCustom falla, se parte del
+ * estado previo; y la categoría mutada siempre queda incluida (así el
+ * registro/pickers nunca la pierden aunque la lectura falle).
+ */
+async function freshList(
+  getState: unknown,
+  ensure?: CategoryConfig,
+  removeId?: string,
+): Promise<CategoryConfig[]> {
+  let list: CategoryConfig[];
+  try {
+    list = await categoryRepository.getCustom();
+  } catch {
+    list = [...prevCustom(getState)];
+  }
+  if (removeId) list = list.filter((c) => c && String(c.id) !== String(removeId));
+  if (ensure) {
+    if (list.some((c) => c && String(c.id) === String(ensure.id))) {
+      list = list.map((c) => (c && String(c.id) === String(ensure.id) ? ensure : c));
+    } else {
+      list = [ensure, ...list];
+    }
+  }
+  return list;
+}
+
 export const createCategory = createAsyncThunk(
   'categories/create',
-  async (input: CustomCategoryInput, { rejectWithValue }) => {
+  async (input: CustomCategoryInput, { getState, rejectWithValue }) => {
     try {
-      await categoryRepository.create(input);
-      const list = await categoryRepository.getCustom().catch(() => [] as CategoryConfig[]);
+      const created = await categoryRepository.create(input);
+      const list = await freshList(getState, created);
       syncRegistry(list);
       return list;
     } catch (e) {
@@ -53,13 +85,13 @@ export const createCategory = createAsyncThunk(
 
 export const updateCategory = createAsyncThunk(
   'categories/update',
-  async ({ id, input }: { id: string; input: CustomCategoryInput }, { rejectWithValue }) => {
+  async ({ id, input }: { id: string; input: CustomCategoryInput }, { getState, rejectWithValue }) => {
     if (!isUserCategory(id)) {
       return rejectWithValue('Las categorías del sistema no se pueden editar');
     }
     try {
-      await categoryRepository.update(id, input);
-      const list = await categoryRepository.getCustom().catch(() => [] as CategoryConfig[]);
+      const updated = await categoryRepository.update(id, input);
+      const list = await freshList(getState, updated);
       syncRegistry(list);
       return list;
     } catch (e) {
@@ -70,7 +102,7 @@ export const updateCategory = createAsyncThunk(
 
 export const deleteCategory = createAsyncThunk(
   'categories/delete',
-  async (id: string, { rejectWithValue }) => {
+  async (id: string, { getState, rejectWithValue }) => {
     if (String(id) === String(SYSTEM_CATEGORY.id)) {
       return rejectWithValue('La categoría del sistema no se puede eliminar');
     }
@@ -90,7 +122,7 @@ export const deleteCategory = createAsyncThunk(
         return rejectWithValue('Tiene presupuesto y no se puede eliminar');
       }
       await categoryRepository.delete(id);
-      const list = await categoryRepository.getCustom().catch(() => [] as CategoryConfig[]);
+      const list = await freshList(getState, undefined, id);
       syncRegistry(list);
       return list;
     } catch (e) {

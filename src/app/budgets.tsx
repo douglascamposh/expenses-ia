@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CalendarDays, ChevronLeft } from 'lucide-react-native';
@@ -40,6 +40,20 @@ export default function BudgetsScreen() {
 
   /** Filas swipe abiertas: solo una a la vez. */
   const swipeRefs = useRef(new Map<string, Swipeable | null>());
+  /** Scroll padre: las filas lo usan para llevar el campo enfocado sobre el teclado. */
+  const scrollRef = useRef<ScrollView | null>(null);
+  /** Y de cada fila dentro del contenido (la reporta BudgetCategoryRow vía onLayout). */
+  const rowY = useRef(new Map<string, number>());
+  /** Al enfocar un monto, subir su fila para que el teclado no la tape. */
+  const scrollToRow = useCallback((id: string) => {
+    const y = rowY.current.get(id);
+    if (y == null) return;
+    try {
+      scrollRef.current?.scrollTo?.({ y: Math.max(0, y - 140), animated: true });
+    } catch {
+      // Sin scroll nativo (tests): el KAV ya sube el contenido.
+    }
+  }, []);
   const closeOtherRows = useCallback((exceptId: string) => {
     swipeRefs.current.forEach((row, id) => {
       if (id !== exceptId) row?.close();
@@ -112,7 +126,18 @@ export default function BudgetsScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} scrollEnabled={!sliding}>
+        <KeyboardAvoidingView
+          style={styles.kav}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={!sliding}
+          keyboardShouldPersistTaps="handled"
+        >
         <View style={styles.headerRow}>
           <Pressable accessibilityLabel={t('budgets_a11yBack')} onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
             <ChevronLeft size={22} color={theme.text} />
@@ -188,6 +213,8 @@ export default function BudgetsScreen() {
                         onTrashPress={handleDelete}
                         swipeRefs={swipeRefs}
                         onOpen={closeOtherRows}
+                        onRowLayout={(y) => rowY.current.set(String(config.id), y)}
+                        onInputFocus={() => scrollToRow(String(config.id))}
                       />
                     ))}
                   </>
@@ -207,6 +234,8 @@ export default function BudgetsScreen() {
                         onTrashPress={handleDelete}
                         swipeRefs={swipeRefs}
                         onOpen={closeOtherRows}
+                        onRowLayout={(y) => rowY.current.set(String(config.id), y)}
+                        onInputFocus={() => scrollToRow(String(config.id))}
                       />
                     ))}
                   </>
@@ -216,6 +245,7 @@ export default function BudgetsScreen() {
           </>
         )}
         </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </ThemedView>
   );
@@ -224,6 +254,7 @@ export default function BudgetsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
+  kav: { flex: 1 },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 40 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },

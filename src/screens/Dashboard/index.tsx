@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Keyboard, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,8 +21,9 @@ import { useTranslation } from '@/i18n/useTranslation';
 import { useTheme } from '@/hooks/use-theme';
 import { getAllCategories, getCategoryConfig, getSuggestions, isUserCategory, resolveCategoryId } from '@/expenses/categories/expenseCategories';
 import { isValidCurrency, isValidKind, type EntryKind, type Expense, type NewExpense } from '@/expenses/models/Expense';
+import type { NewBudget } from '@/expenses/models/Budget';
 import { validateExpenseCommand } from '@/expenses/services/ExpenseService';
-import { formatCurrency, formatDateLabel, formatMonthLabel, formatMonthRange, getCurrencySymbol } from '@/expenses/utils/format';
+import { formatCurrency, formatDateLabel, formatMonthLabel, formatMonthRange, getCurrencySymbol, todayLocalISO } from '@/expenses/utils/format';
 import { groupRecent } from '@/expenses/utils/groupRecent';
 import { useAudioRecording } from '@/hooks/use-audio-recording';
 import { useAnalyzeAudio } from '@/hooks/use-analyze-audio';
@@ -39,18 +40,20 @@ import {
   removePendingAt,
   saveAllExpenses,
   saveOneExpense,
-  semanticSearch,
   setPendingQueue,
   updateExpense,
+  upsertBudget,
 } from '@/store/expensesSlice';
 import { createCategory } from '@/store/categoriesSlice';
 import { createRule, generateRecurrences, saveRecurringDraft } from '@/store/recurringSlice';
 import { draftToRuleInput } from '@/expenses/services/recurring';
 import { setSkipIncome } from '@/store/settingsSlice';
 import { AnalyticsAnswerCard } from '@/components/AnalyticsAnswerCard';
-import { CategoryCarousel, COLLAPSE_D } from '@/components/CategoryCarousel';
+import { BudgetQuickModal } from '@/components/BudgetQuickModal';
+import { CategoryCarousel } from '@/components/CategoryCarousel';
 import { MonthStrip } from '@/components/MonthStrip';
 import { SearchDock } from '@/components/SearchDock';
+import { SpentRingCard } from '@/components/SpentRingCard';
 
 export function DashboardScreen() {
   const router = useRouter();
@@ -120,6 +123,8 @@ export function DashboardScreen() {
   const refresh = useCallback(() => dispatch(fetchExpenses(10)).unwrap(), [dispatch]);
   const [selected, setSelected] = useState<Expense | null>(null);
   const [manualVisible, setManualVisible] = useState(false);
+  /** Categoría con el modal rápido de presupuesto abierto (long-press del carrusel). */
+  const [budgetModalCat, setBudgetModalCat] = useState<string | null>(null);
   /** Sesión del form: solo una apertura nueva reinicia el borrador. */
   const [manualSession, setManualSession] = useState(0);
   const openManual = useCallback((kind: EntryKind) => {
@@ -156,32 +161,15 @@ export function DashboardScreen() {
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   /** Modo del hero: también filtra recientes (gastos/ingresos/todo). */
   const [heroMode, setHeroMode] = useState<'net' | 'exp' | 'inc'>('net');
-  /** Total del día en la moneda principal (o la primera disponible). */
+  /** Neto del día en la moneda principal (o la primera disponible), con su signo. */
   const dayTotal = useCallback((totals: Record<string, number>): { text: string } => {
     const cur = (defaultCurrency in totals ? defaultCurrency : Object.keys(totals)[0]) as NewExpense['currency'] | undefined;
     if (!cur) return { text: '' };
-    return { text: `- ${formatCurrency(totals[cur] ?? 0, cur)}` };
+    const v = totals[cur] ?? 0;
+    const sign = v < 0 ? '- ' : v > 0 ? '+ ' : '';
+    return { text: `${sign}${formatCurrency(Math.abs(v), cur)}` };
   }, [defaultCurrency]);
-  const semanticIds = useAppSelector((s) => s.expenses.semanticIds);
-  const searchMode = useAppSelector((s) => s.expenses.searchMode ?? 'keyword');
   const analytics = useAppSelector((s) => s.expenses.analytics);
-  /** Scroll vertical: compacta las barras de categorías al hacer scroll. */
-  const [scrollY] = useState(() => new Animated.Value(0));
-  /** Colapso por filtro/búsqueda: 0 expandido, 1 píldora. Se suma al scroll. */
-  const filterAnim = useMemo(() => new Animated.Value(0), []);
-  const collapsedFilter = !!filterCategory || searchOpen;
-  useEffect(() => {
-    Animated.timing(filterAnim, {
-      toValue: collapsedFilter ? 1 : 0,
-      duration: 250,
-      useNativeDriver: false,
-    }).start();
-  }, [collapsedFilter, filterAnim]);
-  /** Progreso combinado scroll + filtro (el mayor manda, con tope). */
-  const collapseY = useMemo(
-    () => Animated.add(scrollY, Animated.multiply(filterAnim, COLLAPSE_D)),
-    [scrollY, filterAnim],
-  );
 
   useEffect(() => {
     void dispatch(fetchExpenses(10));
@@ -238,7 +226,7 @@ export function DashboardScreen() {
                 category: resolved,
                 kind: isValidKind(rawKind) ? rawKind : 'EXPENSE',
                 description: String(rawObj.description || 'Gasto'),
-                date: String(rawObj.date || new Date().toISOString().split('T')[0]),
+                date: String(rawObj.date || todayLocalISO()),
                 // El backend envía paymentMethod (CASH/CARD); default CASH si falta.
                 // Editable en el modal antes de guardar.
                 paymentMethod: String(rawObj.paymentMethod || 'CASH'),
@@ -254,7 +242,7 @@ export function DashboardScreen() {
                 category: resolveCategoryId(rawObj.category) as NewExpense['category'],
                 kind: 'EXPENSE',
                 description: String(rawObj.description || ''),
-                date: String(rawObj.date || new Date().toISOString().split('T')[0]),
+                date: String(rawObj.date || todayLocalISO()),
                 paymentMethod: 'CASH',
               });
           }
@@ -275,8 +263,8 @@ export function DashboardScreen() {
     }
   }, [audio, analyzer, dispatch, normalizeCurrency, t]);
 
-  // Buscador del inicio: analítica exacta primero, luego IA, luego keyword.
-  // Filtra la lista visible (mes + categoría + modo) sin salir de la pantalla.
+  // Buscador del inicio: analítica exacta primero, luego keyword.
+  // La IA vive en su pantalla (/ai). Filtra la lista visible sin salir.
   const handleHomeSearch = useCallback(() => {
     const q = searchQuery.trim();
     if (q.length < 2) {
@@ -287,7 +275,7 @@ export function DashboardScreen() {
       .unwrap()
       .then(() => {})
       .catch(() => {
-        void dispatch(semanticSearch(q)).unwrap().catch(() => {});
+        dispatch(clearSemanticSearch());
       });
   }, [searchQuery, dispatch, defaultCurrency]);
 
@@ -335,16 +323,11 @@ export function DashboardScreen() {
         .filter((e) => e && order.has(e.id))
         .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
     }
-    if (searchMode === 'semantic' && Array.isArray(semanticIds)) {
-      const rank = new Map(semanticIds.map((id, i) => [id, i]));
-      return searchScope
-        .filter((e) => e && rank.has(e.id))
-        .sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
-    }
+    // Keyword exacta (la semántica vive en /ai).
     return searchScope.filter(
       (e) => e && (e.description?.toLowerCase().includes(q) || e.category?.toLowerCase().includes(q)),
     );
-  }, [searchScope, searchQuery, searchMode, semanticIds, analytics]);
+  }, [searchScope, searchQuery, analytics]);
 
   /** Recientes del mes agrupados por fecha (máx. 5 fechas, 30 items). Buscando: resultados. */
   const searching = searchOpen && searchQuery.trim().length >= 2;
@@ -449,32 +432,18 @@ export function DashboardScreen() {
   const heroInc = filterCategory
     ? (recent ?? []).filter((e) => e?.category === filterCategory && e.kind === 'INCOME' && e.currency === heroCurrency).reduce((a, e) => a + (e.amount ?? 0), 0)
     : safeIncomeMonth[heroCurrency] ?? 0;
-  const heroNet = heroInc - heroExp;
-  /** Restante de presupuestos en la moneda del hero (null si no hay). Con filtro: el de esa categoría. */
-  const budgetRemaining = ((): number | null => {
-    const inCur = (filterCategory ? budgets.filter((b) => b && b.category === filterCategory) : budgets).filter((b) => b && b.currency === heroCurrency);
-    if (inCur.length === 0) return null;
-    return inCur.reduce((a, b) => a + (b.limit ?? 0), 0) - inCur.reduce((a, b) => a + (b.spent ?? 0), 0);
-  })();
+  /** Hay ingreso en el mes (sin filtrar por categoría): las dos píldoras se quedan fijas. */
+  const hasAnyIncome = Object.values(safeIncomeMonth).some((v) => (v ?? 0) > 0);
   const heroSymbol = getCurrencySymbol(heroCurrency);
-  const fmtShort = (n: number) => new Intl.NumberFormat('es-BO', { maximumFractionDigits: 0 }).format(Math.round(n));
-  const giantValue = heroMode === 'exp' ? heroExp : heroMode === 'inc' ? heroInc : heroNet;
-  const giantSign = heroMode === 'exp' || (heroMode === 'net' && giantValue < 0) ? '-' : '+';
-  const giantColor = giantSign === '+' ? theme.success : '#F0524D';
 
   const thisMonthLabel = formatMonthLabel(new Date(visibleMonth.year, visibleMonth.month - 1, 1), lang);
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <Animated.ScrollView
+        <ScrollView
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
-          scrollEventThrottle={16}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: false },
-          )}
         >
           {/* Header mockup: September + gear */}
           <View style={styles.topBar}>
@@ -541,54 +510,19 @@ export function DashboardScreen() {
           {/* Tarjeta analítica sobre la lista cuando la búsqueda la produce. */}
           {searching && analytics && <AnalyticsAnswerCard answer={analytics} compact />}
 
-          {/* Hero balance: neto + toggle gastos/ingresos + restante presupuesto */}
-          <View style={[styles.hero, collapsedFilter && styles.heroCompact]}>
-            {budgetRemaining !== null ? (
-              budgetRemaining < 0 ? (
-                <Text variant="small" style={{ color: '#F0524D' }}>{t('dashboard_budgetOver', { amount: `${heroSymbol} ${fmtShort(Math.abs(budgetRemaining))}` })}</Text>
-              ) : (
-                <Text variant="small" color="textSecondary">{t('dashboard_budgetRemaining', { amount: `${heroSymbol} ${fmtShort(budgetRemaining)}` })}</Text>
-              )
-            ) : (
-              <Text variant="small" color="textSecondary">{t('dashboard_monthBalance')}</Text>
-            )}
-            <View
-              accessibilityRole="text"
-              accessibilityLabel={t('dashboard_a11ySeeExpenses')}
-            >
-              <View style={styles.giantRow}>
-                <View style={[styles.signBadge, { backgroundColor: giantColor }]}>
-                  <Text style={[styles.signText, { color: theme.white }]}>{giantSign}</Text>
-                </View>
-                <Text style={[styles.giant, { color: theme.text }]}>{loading ? '…' : fmtShort(giantValue)}</Text>
-                <Text style={[styles.giantCur, { color: theme.textSecondary }]}>{heroSymbol}</Text>
-              </View>
-            </View>
-            <View style={[styles.togglePill, { backgroundColor: theme.backgroundElement }]}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('dashboard_a11ySeeMonthExp')}
-                onPress={() => setHeroMode((m) => (m === 'exp' ? 'net' : 'exp'))}
-                style={[styles.toggleSeg, heroMode === 'exp' && { backgroundColor: theme.backgroundSelected }]}
-              >
-                <View style={[styles.miniBadge, { backgroundColor: theme.expense }]}>
-                  <Text style={[styles.miniSign, { color: theme.white }]}>-</Text>
-                </View>
-                <Text variant="smallBold">{fmtShort(heroExp)}</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('dashboard_a11ySeeMonthInc')}
-                onPress={() => setHeroMode((m) => (m === 'inc' ? 'net' : 'inc'))}
-                style={[styles.toggleSeg, heroMode === 'inc' && { backgroundColor: theme.backgroundSelected }]}
-              >
-                <View style={[styles.miniBadge, { backgroundColor: theme.success }]}>
-                  <Text style={[styles.miniSign, { color: theme.white }]}>+</Text>
-                </View>
-                <Text variant="smallBold">{fmtShort(heroInc)}</Text>
-              </Pressable>
-            </View>
-          </View>
+          {/* Anillo % gastado (gasto/ingreso, sin ahorro) encima del hero.
+              Las píldoras Ingreso/Gasto filtran la lista (fuera del hero). */}
+          {!showOnboarding && (
+            <SpentRingCard
+              expense={heroExp}
+              income={heroInc}
+              hasIncome={hasAnyIncome}
+              currencySymbol={heroSymbol}
+              loading={loading}
+              mode={heroMode}
+              onSelectMode={(m) => setHeroMode((prev) => (prev === m ? 'net' : m))}
+            />
+          )}
 
           {/* Carrusel de categorías estilo mockup (full-bleed, sin margen lateral) */}
           {!showOnboarding && (
@@ -597,9 +531,9 @@ export function DashboardScreen() {
               loading={loading}
               budgets={budgets}
               summary={summary}
-              scrollY={collapseY}
               selectedId={filterCategory}
               onSelect={(category) => setFilterCategory(category)}
+              onLongPressCategory={(category) => setBudgetModalCat(category)}
               onSeeAll={() => router.push('/budgets' as never)}
             />
           </View>
@@ -757,49 +691,50 @@ export function DashboardScreen() {
           </>)}
 
           <View style={[styles.footerSpace, { height: 110 + androidLift }]} />
-        </Animated.ScrollView>
+        </ScrollView>
 
         {/* Difuminado tras los flotantes (mockup) + acciones */}
         <FrostedDock height={140 + androidLift} />
-        <View style={[styles.fabPill, { backgroundColor: theme.backgroundElement, bottom: 16 + androidLift }]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('dashboard_a11yAddManual')}
-            onPress={() => openManual('EXPENSE')}
-            style={styles.fabPillButton}
-          >
-            <Plus size={24} color={theme.text} />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('dashboard_a11ySearchExpenses')}
-            accessibilityState={{ disabled: !hasExpenses }}
-            onPress={openSearch}
-            disabled={!hasExpenses}
-            style={[styles.fabPillButton, !hasExpenses && styles.fabPillButtonDisabled]}
-            testID="dashboard-search-button"
-          >
-            <Search size={24} color={hasExpenses ? theme.text : theme.textSecondary} />
-          </Pressable>
+        <View style={[styles.dockWrap, { bottom: 16 + androidLift }]}>
+          <View style={[styles.actionBar, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('dashboard_a11yAddManual')}
+              onPress={() => openManual('EXPENSE')}
+              style={styles.dockButton}
+            >
+              <Plus size={24} color={theme.text} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={audio.isRecording ? t('dashboard_a11yStopRecord') : t('dashboard_a11yVoiceRecord')}
+              onPress={() => router.push('/voice-text' as never)}
+              disabled={analyzer.isLoading || audio.state === 'processing'}
+              style={styles.dockMic}
+            >
+              {audio.isRecording ? (
+                <View style={styles.micRecording}>
+                  <View style={styles.micPulse} />
+                  <View style={styles.micPulse} />
+                  <View style={styles.micPulse} />
+                </View>
+              ) : (
+                <Mic size={28} color="#FFFFFF" strokeWidth={2} />
+              )}
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('dashboard_a11ySearchExpenses')}
+              accessibilityState={{ disabled: !hasExpenses }}
+              onPress={openSearch}
+              disabled={!hasExpenses}
+              style={[styles.dockButton, !hasExpenses && styles.fabPillButtonDisabled]}
+              testID="dashboard-search-button"
+            >
+              <Search size={24} color={hasExpenses ? theme.text : theme.textSecondary} />
+            </Pressable>
+          </View>
         </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={audio.isRecording ? t('dashboard_a11yStopRecord') : t('dashboard_a11yVoiceRecord')}
-          onPress={() => router.push('/voice-text' as never)}
-          disabled={analyzer.isLoading || audio.state === 'processing'}
-          style={[styles.fabMic, { bottom: 16 + androidLift }]}
-        >
-          {audio.isRecording ? (
-            <View style={styles.micRecording}>
-              <View style={styles.micPulse} />
-              <View style={styles.micPulse} />
-              <View style={styles.micPulse} />
-            </View>
-          ) : (
-            <Mic size={28} color="#FFFFFF" strokeWidth={2} />
-          )}
-        </Pressable>
 
         {/* Búsqueda en iOS: dock inferior flotante sobre el teclado (mockup). */}
         {searchOpen && Platform.OS === 'ios' && (
@@ -843,6 +778,27 @@ export function DashboardScreen() {
         defaultCurrency={defaultCurrency}
         initial={{ kind: manualKind }}
         resetKey={manualSession}
+      />
+
+      {/* Presupuesto rápido (long-press en una categoría del carrusel) */}
+      <BudgetQuickModal
+        visible={budgetModalCat !== null}
+        categoryId={budgetModalCat}
+        currency={defaultCurrency}
+        currentLimit={
+          budgetModalCat ? budgets.find((b) => b && String(b.category) === budgetModalCat)?.limit ?? null : null
+        }
+        saving={saving}
+        onClose={() => setBudgetModalCat(null)}
+        onSave={(amount) => {
+          const cat = budgetModalCat;
+          if (!cat) return;
+          const draft: NewBudget = { category: cat as NewBudget['category'], amount, currency: defaultCurrency };
+          void dispatch(upsertBudget(draft))
+            .unwrap()
+            .then(() => setBudgetModalCat(null))
+            .catch((e) => Alert.alert(t('dashboard_saveError'), typeof e === 'string' ? e : t('common_unexpected')));
+        }}
       />
 
       {/* Detail editable con un solo Guardar (borrar vive en el swipe) */}
@@ -908,7 +864,7 @@ export function DashboardScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
-  scroll: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 100 },
+  scroll: { padding: Spacing.four, gap: 8, paddingBottom: 100 },
   carouselBleed: { marginHorizontal: -Spacing.four },
   onboarding: { gap: Spacing.three },
   welcomeCard: { borderRadius: 24, padding: Spacing.four, gap: 2 },
@@ -944,29 +900,6 @@ const styles = StyleSheet.create({
   catFilterEmoji: { fontSize: 18, fontFamily: Fonts.sans },
   catFilterX: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' },
   
-  // Hero balance (mockup: neto gigante + toggle gastos/ingresos)
-  hero: { alignItems: 'center', gap: 8, paddingTop: Spacing.one },
-  heroCompact: { gap: 2, paddingTop: 0 },
-  giantRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  signBadge: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  signText: { fontSize: 18, lineHeight: 22, fontWeight: '800', fontFamily: Fonts.sans, textAlign: 'center' },
-  giant: { fontSize: 56, lineHeight: 64, fontWeight: '800', fontFamily: Fonts.sans, letterSpacing: -1 },
-  giantCur: { fontSize: 22, lineHeight: 28, fontFamily: Fonts.sans },
-  togglePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 999,
-    padding: 6,
-    gap: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  toggleSeg: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 999 },
-  miniBadge: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  miniSign: { fontSize: 13, lineHeight: 16, fontWeight: '800', fontFamily: Fonts.sans, textAlign: 'center' },
   sectionHeaderRight: { flexDirection: 'row', gap: Spacing.three, alignItems: 'center' },
   dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.two, marginBottom: Spacing.one },
   dayPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999 },
@@ -979,24 +912,30 @@ const styles = StyleSheet.create({
   voiceError: { color: '#EF4444', textAlign: 'center', paddingHorizontal: Spacing.four, fontFamily: Fonts.sans },
   footerSpace: { height: 110 },
   searchKav: { position: 'absolute', left: 0, right: 0, bottom: 0 },
-  // Acciones flotantes estilo mockup (sin tab bar)
-  fabPill: {
+  // Barra única centrada: Plus | Mic | Search (mockup)
+  dockWrap: {
     position: 'absolute',
-    left: 16,
+    left: 0,
+    right: 0,
     bottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBar: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 999,
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-    gap: 2,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    gap: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 6,
   },
-  fabPillButton: {
+  dockButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -1004,16 +943,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fabPillButtonDisabled: { opacity: 0.4 },
-  fabMic: {
-    position: 'absolute',
-    right: 16,
-    bottom: 16,
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+  dockMic: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F0524D',
+    marginHorizontal: 4,
+    marginTop: -32,
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
     shadowColor: '#F0524D',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,

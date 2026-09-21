@@ -28,10 +28,10 @@ export function formatDateLabel(date: string, lang: 'es' | 'en' = 'es'): string 
   // date: YYYY-MM-DD
   const d = new Date(date + 'T12:00:00');
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = todayLocalISO(today);
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
-  const yStr = yesterday.toISOString().split('T')[0];
+  const yStr = todayLocalISO(yesterday);
   if (date === todayStr) return lang === 'en' ? 'Today' : 'Hoy';
   if (date === yStr) return lang === 'en' ? 'Yesterday' : 'Ayer';
   return d.toLocaleDateString(lang === 'en' ? 'en-US' : 'es-BO', { day: 'numeric', month: 'short' });
@@ -48,8 +48,20 @@ export function getGreeting(): string {
   return 'Buenas noches';
 }
 
+/**
+ * YYYY-MM-DD con la zona horaria del sistema (NO UTC).
+ * `toISOString()` es UTC: en Bolivia (UTC-4) guardar de noche fechaba "mañana".
+ * Todo lo que el usuario ve como "hoy" debe usar esto.
+ */
+export function todayLocalISO(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function formatMonthRange(date: Date = new Date()): { from: string; to: string } {
-  const from = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
-  const to = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+  const from = todayLocalISO(new Date(date.getFullYear(), date.getMonth(), 1));
+  const to = todayLocalISO(new Date(date.getFullYear(), date.getMonth() + 1, 0));
   return { from, to };
 }

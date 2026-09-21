@@ -6,12 +6,9 @@ import { Modal } from '@/components/ui/Modal';
 import { QuickExpenseForm } from '@/components/QuickExpenseForm';
 import { Spacing } from '@/constants/theme';
 import { DEFAULT_CURRENCY, type Currency, type NewExpense } from '@/expenses/models/Expense';
+import { todayLocalISO } from '@/expenses/utils/format';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useTheme } from '@/hooks/use-theme';
-
-function todayISO(): string {
-  return new Date().toISOString().split('T')[0];
-}
 
 function freshDraft(currency: Currency = DEFAULT_CURRENCY): NewExpense {
   return {
@@ -20,7 +17,7 @@ function freshDraft(currency: Currency = DEFAULT_CURRENCY): NewExpense {
     category: '' as NewExpense['category'],
     kind: 'EXPENSE',
     description: '',
-    date: todayISO(),
+    date: todayLocalISO(),
     paymentMethod: 'CASH',
     recurrence: 'ONCE',
   };

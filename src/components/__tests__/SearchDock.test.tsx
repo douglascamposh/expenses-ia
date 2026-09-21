@@ -1,27 +1,33 @@
 import { fireEvent, render } from '@testing-library/react-native';
 import { SearchDock } from '../SearchDock';
 
-describe('SearchDock', () => {
-  it('bottom: input + X que limpia y cierra', () => {
-    const onChangeQuery = jest.fn();
-    const onClose = jest.fn();
-    const tree = render(
-      <SearchDock placement="bottom" query="pan" onChangeQuery={onChangeQuery} onSubmit={() => {}} onClose={onClose} />,
-    );
-    const input = tree.getByTestId('home-search-input');
-    expect(input.props.value).toBe('pan');
-    fireEvent.changeText(input, 'pan casero');
-    expect(onChangeQuery).toHaveBeenCalledWith('pan casero');
-    fireEvent.press(tree.getByTestId('home-search-close'));
-    expect(onClose).toHaveBeenCalledTimes(1);
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
+}));
+
+describe('SearchDock botón IA', () => {
+  beforeEach(() => {
+    mockPush.mockClear();
   });
 
-  it('top: misma interfaz en flujo', () => {
-    const onSubmit = jest.fn();
-    const tree = render(
-      <SearchDock placement="top" query="" onChangeQuery={() => {}} onSubmit={onSubmit} onClose={() => {}} />,
+  it('sin texto muestra ✨ que abre /ai', () => {
+    const onChange = jest.fn();
+    const { getByTestId, queryByLabelText } = render(
+      <SearchDock query="" onChangeQuery={onChange} onSubmit={() => {}} onClose={() => {}} placement="top" />,
     );
-    fireEvent(tree.getByTestId('home-search-input'), 'submitEditing');
-    expect(onSubmit).toHaveBeenCalledTimes(1);
+    fireEvent.press(getByTestId('home-search-ai'));
+    expect(mockPush).toHaveBeenCalledWith('/ai');
+    expect(queryByLabelText('Limpiar búsqueda')).toBeNull();
+  });
+
+  it('con texto muestra X que limpia', () => {
+    const onChange = jest.fn();
+    const { getByLabelText, queryByTestId } = render(
+      <SearchDock query="hola" onChangeQuery={onChange} onSubmit={() => {}} onClose={() => {}} placement="top" />,
+    );
+    fireEvent.press(getByLabelText('Limpiar búsqueda'));
+    expect(onChange).toHaveBeenCalledWith('');
+    expect(queryByTestId('home-search-ai')).toBeNull();
   });
 });

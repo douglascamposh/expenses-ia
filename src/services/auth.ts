@@ -27,7 +27,7 @@ function toAuthError(e: unknown, fallback: string): AuthError {
     typeof e === 'object' && e !== null && 'code' in e && typeof (e as { code: unknown }).code === 'string'
       ? (e as { code: string }).code
       : undefined;
-  // Mensajes literales en español, como AnalyzeError/EmbedError.
+  // Mensajes literales en español, como AnalyzeError.
   const message =
     code === 'auth/network-request-failed'
       ? 'Sin conexión: no se pudo iniciar sesión. Revisa tu internet.'

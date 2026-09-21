@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { Search, X } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Search, Sparkles, X } from 'lucide-react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from '@/i18n/useTranslation';
 import { Spacing } from '@/constants/theme';
@@ -22,6 +23,7 @@ type Props = {
 export function SearchDock({ query, onChangeQuery, onSubmit, onClose, placement, bottomOffset = 0 }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
+  const router = useRouter();
   const bar = (
     <View style={[styles.row, placement === 'bottom' && styles.rowBottom]}>
       <View style={[styles.inputPill, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
@@ -37,13 +39,22 @@ export function SearchDock({ query, onChangeQuery, onSubmit, onClose, placement,
           autoFocus
           testID="home-search-input"
         />
-        {query.length > 0 && (
+        {query.length > 0 ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('dashboard_a11yClearSearch')}
             onPress={() => onChangeQuery('')}
           >
             <X size={18} color={theme.textSecondary} />
+          </Pressable>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('ai_a11yOpenAi')}
+            onPress={() => router.push('/ai' as never)}
+            testID="home-search-ai"
+          >
+            <Sparkles size={18} color={theme.primary} />
           </Pressable>
         )}
       </View>

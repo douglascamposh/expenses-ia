@@ -74,8 +74,8 @@ describe('Dashboard lista unificada de categorías', () => {
     // FOOD sale una sola vez como barra vertical, con monto y % del total
     expect(getAllByLabelText('Ver Food')).toHaveLength(1);
     expect(getAllByText('600').length).toBeGreaterThanOrEqual(1);
-    // 600 de 500 = 120% del budget (igual que el detalle) y sobre el límite
-    expect(getByText('120%')).toBeTruthy();
+    // 600 de 500 = 120% del budget (compacto + detalle expandido)
+    expect(getAllByText('120%').length).toBeGreaterThanOrEqual(1);
     expect(getByText('+20% sobre')).toBeTruthy();
     // TRANSPORT con presupuesto también
     expect(getByLabelText('Ver Transport')).toBeTruthy();
@@ -84,19 +84,20 @@ describe('Dashboard lista unificada de categorías', () => {
     fireEvent.press(getByLabelText('Ver Food'));
   });
 
-  it('hero muestra restante del presupuesto y toggle gastos/ingresos', async () => {
+  it('sin línea de restante: solo anillo/píldoras y barras', async () => {
     const testStore = configureStore({
       reducer: { expenses: expensesReducer, settings: settingsReducer, categories: categoriesReducer },
       middleware: (g) => g({ serializableCheck: false }),
     });
-    const { getByText, getByLabelText } = render(
+    const { getByLabelText, queryByText } = render(
       <Provider store={testStore}>
         <DashboardScreen />
       </Provider>,
     );
-    // Restante = (500 + 400) - (600 + 60) = 240
-    await waitFor(() => expect(getByText(/presupuesto restante/)).toBeTruthy(), { timeout: 5000 });
-    expect(getByText(/240/)).toBeTruthy();
+    // La línea "presupuesto restante" se quitó del inicio (aunque haya budgets)
+    await waitFor(() => expect(getByLabelText('Ver Food')).toBeTruthy(), { timeout: 5000 });
+    expect(queryByText(/presupuesto restante/)).toBeNull();
+    expect(queryByText(/sobre presupuesto/)).toBeNull();
     expect(getByLabelText('Ver gastos del mes')).toBeTruthy();
     expect(getByLabelText('Ver ingresos del mes')).toBeTruthy();
   });

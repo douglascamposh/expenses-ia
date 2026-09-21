@@ -151,7 +151,7 @@ export function DatePickerModal({ visible, value, onClose, onSelect }: Props) {
                 accessibilityLabel={t('datePicker_a11yChoose', { iso })}
                 accessibilityState={{ selected: active }}
                 onPress={() => setPicked(iso)}
-                style={[styles.dayCell, active && { backgroundColor: theme.primary }]}
+                style={[styles.dayCell, active && { backgroundColor: theme.dark }]}
               >
                 <Text variant="small" color={active ? undefined : 'textSecondary'} style={active ? styles.dayActiveText : undefined}>
                   {day}
@@ -175,22 +175,22 @@ export function DatePickerModal({ visible, value, onClose, onSelect }: Props) {
                   const d = parseISO(q.iso);
                   setView({ year: d.getFullYear(), month: d.getMonth() });
                 }}
-                style={[styles.quickRow, { borderColor: active ? theme.primary : theme.border, backgroundColor: active ? theme.primary + '0D' : theme.backgroundElement }]}
+                style={[styles.quickRow, { borderColor: active ? theme.dark : theme.border, backgroundColor: active ? theme.dark + '0D' : theme.backgroundElement }]}
               >
-                <Calendar size={16} color={active ? theme.primary : theme.textSecondary} />
+                <Calendar size={16} color={active ? theme.dark : theme.textSecondary} />
                 <View style={styles.quickText}>
-                  <Text variant="smallBold" color={active ? 'primary' : undefined}>{q.label}</Text>
+                  <Text variant="smallBold" color={active ? 'dark' : undefined}>{q.label}</Text>
                   <Text variant="caption" color="textSecondary">{formatShortDate(q.iso)}</Text>
                 </View>
-                {active && <Check size={18} color={theme.primary} />}
+                {active && <Check size={18} color={theme.dark} />}
               </Pressable>
             );
           })}
         </View>
 
         <View style={styles.footer}>
-          <Button variant="ghost" size="md" style={{ flex: 1 }} onPress={onClose}>{t('datePicker_cancel')}</Button>
-          <Button variant="primary" size="md" style={{ flex: 1 }} onPress={() => onSelect(picked)}>{t('datePicker_accept')}</Button>
+          <Button variant="neutral" size="md" style={{ flex: 1 }} onPress={onClose}>{t('datePicker_cancel')}</Button>
+          <Button variant="dark" size="md" style={{ flex: 1 }} onPress={() => onSelect(picked)}>{t('datePicker_accept')}</Button>
         </View>
       </View>
     </Modal>

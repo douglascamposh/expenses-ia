@@ -5,6 +5,7 @@ import { draftToRuleInput, generateDueRecurrences } from '@/expenses/services/re
 import type { NewRecurringRule, RecurringRule } from '@/expenses/models/Recurring';
 import { isValidCategory } from '@/expenses/categories/expenseCategories';
 import { isValidCurrency, type Expense, type NewExpense } from '@/expenses/models/Expense';
+import { todayLocalISO } from '@/expenses/utils/format';
 import { fetchExpenses } from './expensesSlice';
 
 export interface RecurringState {
@@ -32,7 +33,7 @@ function toSafeRules(v: RecurringRule[] | null | undefined): RecurringRule[] {
 }
 
 function todayISO(): string {
-  return new Date().toISOString().split('T')[0];
+  return todayLocalISO();
 }
 
 function newExpenseId(): string {

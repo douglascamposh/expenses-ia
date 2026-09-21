@@ -145,6 +145,20 @@ describe('BudgetsScreen (lista de categorías)', () => {
     await waitFor(() => expect(budgetRepository.delete).toHaveBeenCalledWith('COMIDA'));
   });
 
+  it('enfocar el monto no crashea (autoscroll sobre el teclado)', async () => {
+    const { getByLabelText, getByTestId, getByText, UNSAFE_getByType } = renderWithStore();
+    await waitFor(() => expect(getByText('Transporte')).toBeTruthy());
+    // El contenido vive dentro de un KeyboardAvoidingView
+    const { KeyboardAvoidingView } = jest.requireActual('react-native');
+    expect(UNSAFE_getByType(KeyboardAvoidingView)).toBeTruthy();
+    fireEvent.press(getByLabelText('Presupuesto Transporte'));
+    const input = getByTestId('budget-amount-TRANSPORTE');
+    expect(input).toBeTruthy();
+    // Sin layout nativo es no-op, pero no debe lanzar
+    fireEvent(input, 'focus');
+    expect(getByTestId('budget-amount-TRANSPORTE')).toBeTruthy();
+  });
+
   it('tarjeta de alertas: toggle activa y muestra el umbral', async () => {
     const { getByText, getByTestId } = renderWithStore();
     await waitFor(() => expect(getByText('Alertas de presupuesto')).toBeTruthy());

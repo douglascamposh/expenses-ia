@@ -30,6 +30,28 @@ export function isValidCategoryKind(k: unknown): k is CategoryKind {
   return k === 'GASTO' || k === 'INGRESO';
 }
 
+/** "Mascotas" → MASCOTAS: mayúsculas, sin espacios ni signos. */
+export function slugifyCategory(label: string): string {
+  const slug = (label ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 24);
+  return slug || 'CUSTOM';
+}
+
+/** Normaliza para comparar duplicados: sin tildes, minúsculas, sin espacios extra. */
+export function normCategoryLabel(label: string): string {
+  return (label ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
 export type CategoryConfig = {
   id: ExpenseCategory;
   label: string;
@@ -116,7 +138,7 @@ export function getSuggestions(kind?: CategoryKind): CategoryConfig[] {
 function normLookup(raw: unknown): string {
   return String(raw ?? '')
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
     .trim();
 }

@@ -57,6 +57,15 @@ jest.mock('@/expenses/repositories/ExpenseRepository', () => ({
   },
 }));
 
+jest.mock('@/expenses/repositories/BudgetRepository', () => ({
+  budgetRepository: {
+    upsert: jest.fn((b) => Promise.resolve({ ...b })),
+    getAll: jest.fn(() => Promise.resolve([])),
+    getProgress: jest.fn(() => Promise.resolve([])),
+    delete: jest.fn(() => Promise.resolve()),
+  },
+}));
+
 function renderWithStore() {
   const testStore = configureStore({
     reducer: { expenses: expensesReducer, settings: settingsReducer, categories: categoriesReducer },
@@ -91,12 +100,14 @@ describe('Dashboard', () => {
     expenseRepository.getCategorySummary.mockResolvedValueOnce([
       { category: 'FOOD', currency: 'BOB', total: 120 },
     ]);
-    const { getAllByText, getByLabelText, getAllByLabelText, getByText, queryByText } = renderWithStore();
+    const { getAllByText, getByLabelText, getAllByLabelText, getByTestId, queryByText } = renderWithStore();
     await waitFor(() => expect(getByLabelText('Ver Food')).toBeTruthy());
     // Una sola vez y como solo-gasto con su % del total (100% al ser la única)
     expect(getAllByLabelText('Ver Food')).toHaveLength(1);
     expect(getAllByText('120').length).toBeGreaterThanOrEqual(1);
-    expect(getByText('100%')).toBeTruthy();
+    // 100% de la barra de categoría + 100% del anillo gastado (sin ingreso → rojo completo)
+    expect(getAllByText('100%').length).toBeGreaterThanOrEqual(1);
+    expect(getByTestId('spent-ring-card')).toBeTruthy();
     expect(queryByText(/Falta/)).toBeNull();
   });
 
@@ -122,6 +133,25 @@ describe('Dashboard', () => {
     fireEvent.press(getByTestId('home-search-close'));
     await waitFor(() => expect(getByText(/Sin gastos todavía/)).toBeTruthy());
     expect(mockPush).not.toHaveBeenCalledWith(expect.stringContaining('/explore'));
+  });
+
+  it('el dock muestra ✨ que abre la IA y buscar sigue siendo keyword', async () => {
+    const { expenseRepository } = jest.requireMock('@/expenses/repositories/ExpenseRepository') as {
+      expenseRepository: { getAll: jest.Mock };
+    };
+    expenseRepository.getAll.mockResolvedValueOnce([
+      {
+        id: 'e1', amount: 35, currency: 'BOB', category: 'FOOD', description: 'Almuerzo',
+        date: '2026-09-07', paymentMethod: 'CASH',
+        createdAt: '2026-09-07T12:00:00.000Z', updatedAt: '2026-09-07T12:00:00.000Z',
+      },
+    ]);
+    const { getByLabelText, getByTestId, getByText } = renderWithStore();
+    await waitFor(() => expect(getByText(/Sin gastos todavía/)).toBeTruthy());
+    fireEvent.press(getByLabelText('Buscar gastos'));
+    // ✨ abre /ai (la semántica ya no vive aquí)
+    fireEvent.press(getByTestId('home-search-ai'));
+    expect(mockPush).toHaveBeenCalledWith('/ai');
   });
 
   it('buscar filtra por texto y respeta el filtro de categoría activo', async () => {
@@ -238,7 +268,7 @@ describe('Dashboard', () => {
     expect(queryByText('Almuerzo')).toBeTruthy();
   });
 
-  it('filtrar colapsa las barras y quitar el filtro las expande', async () => {
+  it('seleccionar expande la píldora y quitar el filtro la encoge', async () => {
     const { Animated: RNAnimated } = jest.requireActual('react-native');
     const starts: number[] = [];
     const timingSpy = jest.spyOn(RNAnimated, 'timing').mockImplementation(
@@ -265,12 +295,12 @@ describe('Dashboard', () => {
         .mockResolvedValueOnce([]);
       const { getByLabelText, getByTestId, queryByTestId } = renderWithStore();
       await waitFor(() => expect(getByLabelText('Ver Food')).toBeTruthy());
-      // Montaje: colapso a 0
+      // Montaje sin filtro: todo a 0 (píldoras)
       expect(starts[starts.length - 1]).toBe(0);
-      // Filtrar → colapsa a 1
+      // Seleccionar → expande a 1
       fireEvent.press(getByLabelText('Ver Food'));
       await waitFor(() => expect(getByTestId('category-filter-chip')).toBeTruthy());
-      expect(starts[starts.length - 1]).toBe(1);
+      expect(starts).toContain(1);
       // Quitar filtro → vuelve a 0
       fireEvent.press(getByTestId('category-filter-chip'));
       await waitFor(() => expect(queryByTestId('category-filter-chip')).toBeNull());
@@ -280,29 +310,36 @@ describe('Dashboard', () => {
     }
   });
 
-  it('el hero es estático y no navega fuera del inicio', async () => {
-    const { getByLabelText, getByText } = renderWithStore();
-    await waitFor(() => expect(getByText(/Sin gastos todavía/)).toBeTruthy());
-    fireEvent.press(getByLabelText('Ver gastos'));
+  it('la sección de balance es estática y no navega fuera del inicio', async () => {
+    const { getByText, getByTestId } = renderWithStore();
+    await waitFor(() => expect(getByText('Tu balance: 0 Bs')).toBeTruthy());
+    fireEvent.press(getByTestId('spent-expense-pill'));
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('hero muestra neto y el toggle cambia a ingresos', async () => {
+  it('las píldoras muestran ingreso/gasto y marcan el filtro al tocar', async () => {
     const { expenseRepository } = jest.requireMock('@/expenses/repositories/ExpenseRepository') as {
       expenseRepository: { getCategorySummary: jest.Mock };
     };
     expenseRepository.getCategorySummary
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ category: 'OTHER', currency: 'BOB', total: 1000 }]);
-    const { getByLabelText, getAllByText } = renderWithStore();
-    // Neto = 1000 - 0 (gigante + segmento de ingresos)
-    await waitFor(() => expect(getAllByText('1.000')).toHaveLength(2));
+    const { getByLabelText, getByTestId, getByText, queryByText } = renderWithStore();
+    // Píldoras con montos (sin título ni cifra gigante del hero viejo)
+    await waitFor(() => expect(getByText('1.000 Bs')).toBeTruthy());
+    expect(getByText('0 Bs')).toBeTruthy();
+    expect(queryByText('Balance del mes')).toBeNull();
     expect(getByLabelText('Ver gastos del mes')).toBeTruthy();
     expect(getByLabelText('Ver ingresos del mes')).toBeTruthy();
+    expect(getByTestId('spent-expense-pill').props.accessibilityState?.selected).toBe(false);
     fireEvent.press(getByLabelText('Ver gastos del mes'));
-    await waitFor(() => expect(getAllByText('0')).toHaveLength(2));
+    await waitFor(() =>
+      expect(getByTestId('spent-expense-pill').props.accessibilityState?.selected).toBe(true),
+    );
     fireEvent.press(getByLabelText('Ver ingresos del mes'));
-    await waitFor(() => expect(getAllByText('1.000')).toHaveLength(2));
+    await waitFor(() =>
+      expect(getByTestId('spent-income-pill').props.accessibilityState?.selected).toBe(true),
+    );
   });
 
   it('botón + abre el modal de alta manual', async () => {
@@ -311,7 +348,7 @@ describe('Dashboard', () => {
     // Solo el + de la píldora flotante (el header solo lleva Settings)
     expect(queryAllByLabelText('Agregar gasto manual')).toHaveLength(1);
     fireEvent.press(queryAllByLabelText('Agregar gasto manual')[0]);
-    await waitFor(() => expect(getByPlaceholderText('En qué gasté')).toBeTruthy());
+    await waitFor(() => expect(getByPlaceholderText('Detalles del gasto')).toBeTruthy());
     expect(getByLabelText('Guardar')).toBeTruthy();
   });
 
@@ -345,9 +382,9 @@ describe('Dashboard', () => {
     expect(second.getByTestId('home-search-input')).toBeTruthy();
   });
 
-  it('el toggle del hero filtra recientes por ingresos/gastos', async () => {
+  it('las píldoras filtran recientes por ingresos/gastos', async () => {
     const { expenseRepository } = jest.requireMock('@/expenses/repositories/ExpenseRepository') as {
-      expenseRepository: { getByMonthRange: jest.Mock };
+      expenseRepository: { getByMonthRange: jest.Mock; getCategorySummary: jest.Mock };
     };
     const today = new Date().toISOString().split('T')[0];
     const stamp = `${today}T12:00:00.000Z`;
@@ -358,6 +395,10 @@ describe('Dashboard', () => {
       .mockResolvedValueOnce([
         { id: 'i1', amount: 200, currency: 'BOB', category: 'OTHER', kind: 'INCOME', description: 'Sueldo', date: today, paymentMethod: 'CASH', createdAt: stamp, updatedAt: stamp },
       ]);
+    // Resumen de ingresos para que se rendericen ambas píldoras (filtro).
+    expenseRepository.getCategorySummary
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ category: 'OTHER', currency: 'BOB', total: 200 }]);
     const { getByLabelText, getByText, queryByText } = renderWithStore();
     await waitFor(() => expect(getByText('Almuerzo')).toBeTruthy());
     expect(getByText('Sueldo')).toBeTruthy();
@@ -370,5 +411,45 @@ describe('Dashboard', () => {
     // Tocar de nuevo vuelve al neto (todo visible)
     fireEvent.press(getByLabelText('Ver gastos del mes'));
     await waitFor(() => expect(getByText('Sueldo')).toBeTruthy());
+  });
+
+  it('chip del día muestra el neto con su signo (ingreso no se resta)', async () => {
+    const { expenseRepository } = jest.requireMock('@/expenses/repositories/ExpenseRepository') as {
+      expenseRepository: { getByMonthRange: jest.Mock };
+    };
+    const today = new Date().toISOString().split('T')[0];
+    const stamp = `${today}T12:00:00.000Z`;
+    expenseRepository.getByMonthRange
+      .mockResolvedValueOnce([
+        { id: 'e1', amount: 500, currency: 'BOB', category: 'FOOD', kind: 'EXPENSE', description: 'Almuerzo', date: today, paymentMethod: 'CASH', createdAt: stamp, updatedAt: stamp },
+      ])
+      .mockResolvedValueOnce([
+        { id: 'i1', amount: 3000, currency: 'BOB', category: 'OTHER', kind: 'INCOME', description: 'Sueldo', date: today, paymentMethod: 'CASH', createdAt: stamp, updatedAt: stamp },
+      ]);
+    const { getByText, queryByText } = renderWithStore();
+    await waitFor(() => expect(getByText('Almuerzo')).toBeTruthy());
+    // Neto 3000 - 500 = +2500; nunca "- 3.500" (ingreso sumado como gasto)
+    expect(getByText('+ Bs 2.500,00')).toBeTruthy();
+    expect(queryByText(/- Bs 3\.500/)).toBeNull();
+  });
+
+  it('long-press en categoría abre el modal de presupuesto y guarda', async () => {
+    const { expenseRepository } = jest.requireMock('@/expenses/repositories/ExpenseRepository') as {
+      expenseRepository: { getCategorySummary: jest.Mock };
+    };
+    expenseRepository.getCategorySummary.mockResolvedValueOnce([
+      { category: 'FOOD', currency: 'BOB', total: 120 },
+    ]);
+    const { getByLabelText, getByText, getByTestId } = renderWithStore();
+    await waitFor(() => expect(getByLabelText('Ver Food')).toBeTruthy());
+    fireEvent(getByLabelText('Ver Food'), 'longPress');
+    await waitFor(() => expect(getByText(/Presupuesto/)).toBeTruthy());
+    fireEvent.changeText(getByTestId('budget-quick-amount-FOOD'), '500');
+    fireEvent.press(getByLabelText('Guardar presupuesto'));
+    const { budgetRepository } = jest.requireMock('@/expenses/repositories/BudgetRepository') as {
+      budgetRepository: { upsert: jest.Mock };
+    };
+    await waitFor(() => expect(budgetRepository.upsert).toHaveBeenCalled());
+    expect(budgetRepository.upsert.mock.calls[0][0]).toMatchObject({ category: 'FOOD', amount: 500 });
   });
 });

@@ -7,7 +7,6 @@ import settingsReducer from '@/store/settingsSlice';
 import categoriesReducer from '@/store/categoriesSlice';
 import { expenseRepository, InMemoryExpenseRepository } from '@/expenses/repositories/ExpenseRepository';
 import { budgetRepository, InMemoryBudgetRepository } from '@/expenses/repositories/BudgetRepository';
-import { embeddingRepository, InMemoryEmbeddingRepository } from '@/expenses/repositories/EmbeddingRepository';
 import { setCustomCategories } from '@/expenses/categories/expenseCategories';
 
 jest.mock('@/hooks/use-audio-recording', () => ({
@@ -36,13 +35,10 @@ jest.mock('@/hooks/use-analyze-audio', () => ({
 
 const memExp = new InMemoryExpenseRepository();
 const memBud = new InMemoryBudgetRepository();
-const memEmb = new InMemoryEmbeddingRepository();
 const expSingleton = expenseRepository as unknown as Record<string, unknown>;
 const budSingleton = budgetRepository as unknown as Record<string, unknown>;
-const embSingleton = embeddingRepository as unknown as Record<string, unknown>;
 const expOrig = { ...expSingleton };
 const budOrig = { ...budSingleton };
-const embOrig = { ...embSingleton };
 
 beforeEach(async () => {
   (expenseRepository as unknown as InMemoryExpenseRepository).create = memExp.create.bind(memExp);
@@ -54,13 +50,8 @@ beforeEach(async () => {
   (expenseRepository as unknown as InMemoryExpenseRepository).update = memExp.update.bind(memExp);
   (expenseRepository as unknown as InMemoryExpenseRepository).clearAll = memExp.clearAll.bind(memExp);
   (budgetRepository as unknown as InMemoryBudgetRepository).getProgress = memBud.getProgress.bind(memBud);
-  (embeddingRepository as unknown as InMemoryEmbeddingRepository).getAll = memEmb.getAll.bind(memEmb);
-  (embeddingRepository as unknown as InMemoryEmbeddingRepository).getModelStats = memEmb.getModelStats.bind(memEmb);
-  (embeddingRepository as unknown as InMemoryEmbeddingRepository).getMissingExpenseIds =
-    memEmb.getMissingExpenseIds.bind(memEmb);
   await memExp.clearAll();
   await memBud.clearAll();
-  await memEmb.clearAll();
   setCustomCategories([]);
   await memExp.create({
     id: 'e1', amount: 35, currency: 'BOB', category: 'FOOD', description: 'Almuerzo',
@@ -76,7 +67,6 @@ afterEach(() => {
 afterAll(() => {
   Object.assign(expSingleton, expOrig);
   Object.assign(budSingleton, budOrig);
-  Object.assign(embSingleton, embOrig);
 });
 
 function renderWithStore() {

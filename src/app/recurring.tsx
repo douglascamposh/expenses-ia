@@ -14,11 +14,12 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchRules, removeRule, updateRule } from '@/store/recurringSlice';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useTheme } from '@/hooks/use-theme';
+import { todayLocalISO } from '@/expenses/utils/format';
 
 type Filter = 'ALL' | EntryKind;
 
 function todayISO(): string {
-  return new Date().toISOString().split('T')[0];
+  return todayLocalISO();
 }
 
 export default function RecurringScreen() {

@@ -5,7 +5,7 @@ let db: SQLite.SQLiteDatabase | null = null;
 let dbInit: Promise<SQLite.SQLiteDatabase> | null = null;
 
 const DB_NAME = 'expenses.db';
-const DB_VERSION = 9;
+const DB_VERSION = 10;
 
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (db) return db;
@@ -318,6 +318,20 @@ async function migrate(database: SQLite.SQLiteDatabase) {
       if (__DEV__) console.warn('[sqlite] recurring_id ya existe, se continúa');
     }
     await database.runAsync('INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (?, ?)', [9, new Date().toISOString()]);
+  }
+
+  if (current < 10) {
+    // Historial de la IA Financiera (paginado newest-first por id).
+    await database.execAsync(`
+      CREATE TABLE IF NOT EXISTS ai_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_ai_messages_id ON ai_messages(id);
+    `);
+    await database.runAsync('INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (?, ?)', [10, new Date().toISOString()]);
   }
 
   // Reparación defensiva (corre siempre): si una migración vieja quedó marcada

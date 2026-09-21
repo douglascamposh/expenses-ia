@@ -47,6 +47,7 @@ export default function RootLayout() {
             <Stack.Screen name="categories" />
             <Stack.Screen name="recurring" />
             <Stack.Screen name="voice-text" />
+            <Stack.Screen name="ai" />
             <Stack.Screen name="diagnostics" />
           </Stack>
         </ThemeProvider>

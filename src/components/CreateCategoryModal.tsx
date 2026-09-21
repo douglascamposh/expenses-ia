@@ -6,6 +6,7 @@ import { Input, Text } from '@/components/ui';
 import { Modal } from '@/components/ui/Modal';
 import { Fonts, Spacing } from '@/constants/theme';
 import type { CategoryConfig, CategoryKind } from '@/expenses/categories/expenseCategories';
+import { getAllCategories, normCategoryLabel } from '@/expenses/categories/expenseCategories';
 import { useAppDispatch } from '@/store/hooks';
 import { createCategory, updateCategory } from '@/store/categoriesSlice';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -42,8 +43,8 @@ type Props = {
   /** Kind preseleccionado al crear (p. ej. desde el formulario de gasto). */
   kindPreset?: CategoryKind;
   onClose: () => void;
-  /** Al crear recibe la etiqueta (para seleccionarla); al editar null. */
-  onSaved: (createdLabel: string | null) => void;
+  /** Al crear recibe id+kind (para seleccionarla); al editar null. */
+  onSaved: (created: { id: string; kind: CategoryKind; label: string } | null) => void;
 };
 
 /**
@@ -102,7 +103,28 @@ export function CreateCategoryModal({ visible, saving, initial, kindPreset = 'GA
     if (initial) {
       void dispatch(updateCategory({ id: String(initial.id), input })).unwrap().then(() => onSaved(null)).catch(fail);
     } else {
-      void dispatch(createCategory(input)).unwrap().then(() => onSaved(input.label)).catch(fail);
+      // La creada se busca en el resultado del thunk (no en el registro global):
+      // así el id+kind llegan aunque el registro tarde en sincronizar.
+      // Respaldo: registro global por si el payload no la trae.
+      // TODO-DEBUG: logs temporales para bug "categoría no aparece" (quitar).
+      // eslint-disable-next-line no-console
+      console.log('[DBG-cat] guardar', JSON.stringify({ label: input.label, kind: input.kind }));
+      void dispatch(createCategory(input)).unwrap().then((list) => {
+        const want = normCategoryLabel(input.label);
+        const created = (list ?? []).find((c) => c && normCategoryLabel(c.label) === want)
+          ?? getAllCategories().find((c) => c && normCategoryLabel(c.label) === want);
+        // eslint-disable-next-line no-console
+        console.log('[DBG-cat] resuelto', JSON.stringify({
+          payload: (list ?? []).length,
+          registry: getAllCategories().length,
+          found: created ? { id: String(created.id), kind: created.kind } : null,
+        }));
+        onSaved(created ? { id: String(created.id), kind: created.kind, label: created.label } : null);
+      }).catch((e) => {
+        // eslint-disable-next-line no-console
+        console.log('[DBG-cat] error', String((e as Error)?.message ?? e));
+        fail(e);
+      });
     }
   };
 
@@ -194,11 +216,11 @@ export function CreateCategoryModal({ visible, saving, initial, kindPreset = 'GA
             accessibilityLabel={t('categories_save')}
             onPress={handleSave}
             disabled={saving}
-            style={[styles.saveCircle, { backgroundColor: theme.dark }, saving && { opacity: 0.6 }]}
+            style={[styles.saveBtn, { backgroundColor: theme.dark }, saving && { opacity: 0.6 }]}
           >
-            <Check size={22} color={theme.white} strokeWidth={3} />
+            <Check size={20} color={theme.white} strokeWidth={3} />
+            <Text variant="smallBold" style={{ color: theme.white }}>{t('categories_save')}</Text>
           </Pressable>
-          <Text variant="smallBold" style={{ color: theme.text }}>{t('categories_save')}</Text>
         </View>
       </ScrollView>
   );
@@ -238,7 +260,7 @@ const styles = StyleSheet.create({
   presetEmoji: { fontSize: 20 },
   colorBox: { width: 32, height: 32, borderRadius: 16, borderWidth: 1.5 },
   footer: { alignItems: 'center', gap: Spacing.one },
-  saveCircle: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 16 },
 });
 
 export default CreateCategoryModal;

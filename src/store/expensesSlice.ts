@@ -1,29 +1,16 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { expenseRepository } from '@/expenses/repositories/ExpenseRepository';
 import { budgetRepository } from '@/expenses/repositories/BudgetRepository';
-import { embeddingRepository } from '@/expenses/repositories/EmbeddingRepository';
 import { ExpenseService } from '@/expenses/services/ExpenseService';
-import { embedText } from '@/services/expense-api';
 import type { Expense, NewExpense } from '@/expenses/models/Expense';
 import type { BudgetProgress, NewBudget } from '@/expenses/models/Budget';
 import { formatMonthRange } from '@/expenses/utils/format';
-import { buildBilingualEmbeddingText } from '@/expenses/utils/embeddingText';
-import { cosineSimilarity } from '@/expenses/utils/vectors';
 import { getCategoryLabel } from '@/expenses/categories/expenseCategories';
 import { parseAnalyticsQuery, resolveScopeRange, scopeLabel } from '@/expenses/analytics/queryIntent';
 
 export type CategorySummary = { category: string; currency: string; total: number };
 
-export const SEMANTIC_MIN_SCORE = 0.35;
 export const SEMANTIC_MAX_RESULTS = 50;
-/** Tope visible de resultados semánticos (el resto es ruido). */
-export const SEMANTIC_TOP_RESULTS = 10;
-/** Fracción del mejor score para el corte relativo (discrimina listas parejas). */
-export const SEMANTIC_TOP_FRACTION = 0.75;
-/** Si el top 10 puntúa casi igual y son muchos, no hay discriminación → keyword. */
-export const SEMANTIC_FLAT_SPREAD = 0.08;
-export const SEMANTIC_FLAT_MIN_COUNT = 5;
-export const BACKFILL_BATCH = 25;
 
 export type VisibleMonth = { year: number; month: number };
 
@@ -49,10 +36,6 @@ export interface ExpensesState {
   /** Progreso mensual de presupuestos (límite vs gastado). */
   budgets: BudgetProgress[];
   budgetError: string | null;
-  /** Resultado de búsqueda semántica: ids ordenados por score, null = keyword. */
-  semanticIds: string[] | null;
-  semanticModel: string | null;
-  searchMode: 'keyword' | 'semantic';
   /** Respuesta exacta a pregunta analítica ("cuánto gasté", "gasto más fuerte"). */
   analytics: AnalyticsAnswer | null;
 }
@@ -90,9 +73,6 @@ const initialState: ExpensesState = {
   saveError: null,
   budgets: [],
   budgetError: null,
-  semanticIds: null,
-  semanticModel: null,
-  searchMode: 'keyword',
   analytics: null,
 };
 
@@ -206,109 +186,8 @@ async function refreshBestEffort(refresh: () => Promise<unknown>) {
 }
 
 /**
- * Embebe un gasto en fondo (best-effort, nunca falla visiblemente).
- * Se dispara tras cada guardado exitoso; el backfill cubre lo pendiente.
- */
-export const embedExpense = createAsyncThunk(
-  'expenses/embedOne',
-  async ({ expenseId, text }: { expenseId: string; text: string }, { rejectWithValue }) => {
-    try {
-      if (!expenseId || !text?.trim()) return rejectWithValue('Nada que embebir');
-      const { vector, model } = await embedText(text);
-      await embeddingRepository.upsert(expenseId, vector, model);
-      return { expenseId, model };
-    } catch (e) {
-      if (__DEV__) console.error('[embed] falló (best-effort, reintenta el backfill):', (e as Error)?.message ?? e);
-      return rejectWithValue((e as Error)?.message ?? 'No se pudo generar embedding');
-    }
-  },
-);
-
-/** Embebe los gastos sin vector (máx. BACKFILL_BATCH por corrida). */
-export const backfillEmbeddings = createAsyncThunk(
-  'expenses/backfillEmbeddings',
-  async ({ limit = BACKFILL_BATCH }: { limit?: number } = {}, { getState }) => {
-    const items = ((getState() as { expenses: ExpensesState }).expenses.items ?? []).filter(Boolean);
-    if (items.length === 0) return { indexed: 0, model: null as string | null };
-    // Aprender el modelo activo: primero con stats, si no hay vectores con un embed.
-    let model: string | null = null;
-    try {
-      const stats = await embeddingRepository.getModelStats();
-      const top = [...stats].sort((a, b) => b.count - a.count)[0];
-      if (top) model = top.model;
-    } catch {
-      // ignorar, se intenta aprender abajo
-    }
-    let indexed = 0;
-    if (!model) {
-      const first = items[0];
-      const probe = await embedText(buildBilingualEmbeddingText(first));
-      model = probe.model;
-      await embeddingRepository.upsert(first.id, probe.vector, probe.model);
-      indexed = 1;
-    }
-    const missing = await embeddingRepository.getMissingExpenseIds(
-      model,
-      items.map((e) => e.id),
-    );
-    if (__DEV__ && missing.length > 0) console.log('[embed] backfill: faltantes', missing.length, 'modelo', model);
-    const byId = new Map(items.map((e) => [e.id, e]));
-    for (const id of missing.slice(0, Math.max(limit - indexed, 0))) {
-      const exp = byId.get(id);
-      if (!exp) continue;
-      try {
-        const { vector, model: m } = await embedText(buildBilingualEmbeddingText(exp));
-        if (m !== model) continue; // el backend cambió de modelo a mitad del backfill
-        await embeddingRepository.upsert(id, vector, m);
-        indexed += 1;
-      } catch {
-        // best-effort: se reintenta en la próxima corrida
-      }
-    }
-    return { indexed, model };
-  },
-);
-
-/** Búsqueda semántica: embebe el query y ordena por coseno. Falla → keyword. */
-export const semanticSearch = createAsyncThunk(
-  'expenses/semanticSearch',
-  async (query: string, { rejectWithValue }) => {
-    const q = (query ?? '').trim();
-    if (q.length < 2) return rejectWithValue('query muy corta');
-    try {
-      const { vector, model } = await embedText(q);
-      const docs = await embeddingRepository.getAll(model);
-      if (docs.length === 0) return rejectWithValue('sin índice');
-      const ranked = docs
-        .map((d) => ({ id: d.expenseId, score: cosineSimilarity(vector, d.vector) }))
-        .filter((s) => s.score >= SEMANTIC_MIN_SCORE)
-        .sort((a, b) => b.score - a.score);
-      // Sin matches sobre el umbral: rechazar para degradar a keyword
-      // (un fulfilled vacío ocultaría resultados que el texto sí matchea).
-      if (ranked.length === 0) return rejectWithValue('sin matches sobre el umbral');
-      // Corte relativo: conserva lo cercano al mejor (evita "devuelve todo").
-      const top = ranked[0].score;
-      const sharp = ranked
-        .filter((s) => s.score >= Math.max(SEMANTIC_MIN_SCORE, top * SEMANTIC_TOP_FRACTION))
-        .slice(0, SEMANTIC_TOP_RESULTS);
-      if (sharp.length === 0) return rejectWithValue('sin matches sobre el umbral');
-      // Lista pareja y larga = sin discriminación → keyword la cubre mejor.
-      const tail = sharp[Math.min(sharp.length, SEMANTIC_TOP_RESULTS) - 1].score;
-      if (sharp.length > SEMANTIC_FLAT_MIN_COUNT && top - tail < SEMANTIC_FLAT_SPREAD) {
-        return rejectWithValue('sin discriminación');
-      }
-      if (__DEV__) console.log('[semantic] top', top.toFixed(3), 'n', sharp.length);
-      return { expenseIds: sharp.map((r) => r.id), model };
-    } catch (e) {
-      return rejectWithValue((e as Error)?.message ?? 'Búsqueda IA no disponible');
-    }
-  },
-);
-
-/**
  * Responde preguntas analíticas ("cuánto gasté", "gasto más fuerte") con
- * cálculo exacto desde SQLite. Rechaza si no es analítica (→ semántico)
- * o si un max no tiene datos (el total 0 sí es respuesta válida).
+ * cálculo exacto desde SQLite. Rechaza si no es analítica.
  */
 export const answerAnalytics = createAsyncThunk(
   'expenses/answerAnalytics',
@@ -370,17 +249,6 @@ export const answerAnalytics = createAsyncThunk(
   },
 );
 
-/** Dispara embedExpense sin bloquear al llamador (tras guardados exitosos). */
-function queueEmbedding(dispatch: (a: never) => unknown, expense: Expense) {
-  try {
-    void dispatch(
-      embedExpense({ expenseId: expense.id, text: buildBilingualEmbeddingText(expense) }) as never,
-    );
-  } catch {
-    // nunca debe romper el flujo de guardado
-  }
-}
-
 /**
  * Guarda UN borrador en SQLite.
  * Recibe snapshot {index, draft} desde el modal: no depende de closures
@@ -404,7 +272,6 @@ export const saveOneExpense = createAsyncThunk(
     dispatch(removePendingAt(index));
     // Releer SQLite como fuente de verdad (best-effort)
     await refreshBestEffort(() => dispatch(fetchExpenses(10)).unwrap());
-    queueEmbedding(dispatch, saved);
     return saved;
   },
 );
@@ -430,8 +297,6 @@ export const saveAllExpenses = createAsyncThunk(
     }
     dispatch(clearPending());
     await refreshBestEffort(() => dispatch(fetchExpenses(10)).unwrap());
-    // Los nuevos quedan cubiertos por el backfill (fondo, con tope por corrida)
-    void dispatch(backfillEmbeddings({})).catch(() => {});
     if (failures.length > 0) {
       return rejectWithValue(`Algunos no se guardaron: ${failures.join('; ')}`);
     }
@@ -457,7 +322,6 @@ export const createExpense = createAsyncThunk(
       return rejectWithValue((e as Error).message ?? 'No se pudo guardar');
     }
     await refreshBestEffort(() => dispatch(fetchExpenses(10)).unwrap());
-    queueEmbedding(dispatch, saved);
     return saved;
   },
 );
@@ -484,7 +348,6 @@ export const updateExpense = createAsyncThunk(
     // Fila inexistente: reportarlo en vez de un no-op silencioso
     if (!updated) return rejectWithValue('Gasto no encontrado');
     await refreshBestEffort(() => dispatch(fetchExpenses(10)).unwrap());
-    queueEmbedding(dispatch, updated);
     return updated;
   },
 );
@@ -517,9 +380,7 @@ const expensesSlice = createSlice({
       state.saveError = null;
     },
     clearSemanticSearch(state) {
-      state.semanticIds = null;
-      state.semanticModel = null;
-      state.searchMode = 'keyword';
+      // Solo queda limpiar la respuesta analítica (la semántica se eliminó).
       state.analytics = null;
     },
   },
@@ -611,26 +472,11 @@ const expensesSlice = createSlice({
       .addCase(updateExpense.rejected, (state, action) => {
         state.error = (action.payload as string) ?? action.error.message ?? 'No se pudo actualizar';
       })
-      .addCase(semanticSearch.fulfilled, (state, action) => {
-        state.semanticIds = [...action.payload.expenseIds];
-        state.semanticModel = action.payload.model;
-        state.searchMode = 'semantic';
-        state.analytics = null;
-      })
       .addCase(answerAnalytics.fulfilled, (state, action) => {
         state.analytics = { ...action.payload };
-        state.semanticIds = null;
-        state.semanticModel = null;
-        state.searchMode = 'keyword';
       })
       .addCase(answerAnalytics.rejected, (state) => {
         state.analytics = null;
-      })
-      .addCase(semanticSearch.rejected, (state) => {
-        // Fallback a keyword: sin red, sin índice o sin matches
-        state.semanticIds = null;
-        state.semanticModel = null;
-        state.searchMode = 'keyword';
       });
   },
 });

@@ -78,7 +78,7 @@ describe('CategoriesScreen (categorías del usuario)', () => {
     await waitFor(() => expect(getByText('Añadir categoría nueva')).toBeTruthy());
     fireEvent.press(getByText('+ Nueva categoría'));
     await waitFor(() => expect(getByText('Nueva categoría')).toBeTruthy());
-    fireEvent.changeText(getByPlaceholderText('Mascotas'), 'Mascotas');
+    fireEvent.changeText(getByPlaceholderText('Compras'), 'Mascotas');
     fireEvent.press(getByLabelText('Guardar'));
     await waitFor(() => expect(getByText('Mascotas')).toBeTruthy());
     expect(getByText('Mascotas')).toBeTruthy();
@@ -97,12 +97,12 @@ describe('CategoriesScreen (categorías del usuario)', () => {
     await waitFor(() => expect(getByText('Añadir categoría nueva')).toBeTruthy());
     fireEvent.press(getByText('+ Nueva categoría'));
     await waitFor(() => expect(getByText('Nueva categoría')).toBeTruthy());
-    fireEvent.changeText(getByPlaceholderText('Mascotas'), 'Mascotas');
+    fireEvent.changeText(getByPlaceholderText('Compras'), 'Mascotas');
     fireEvent.press(getByLabelText('Guardar'));
     await waitFor(() => expect(getByText('Mascotas')).toBeTruthy());
     fireEvent.press(getByLabelText('Editar Mascotas'));
     await waitFor(() => expect(getByText('Editar categoría')).toBeTruthy());
-    fireEvent.changeText(getByPlaceholderText('Mascotas'), 'Peludos');
+    fireEvent.changeText(getByPlaceholderText('Compras'), 'Peludos');
     fireEvent.press(getByLabelText('Guardar'));
     await waitFor(() => expect(getByText('Peludos')).toBeTruthy());
   });
@@ -112,19 +112,19 @@ describe('CategoriesScreen (categorías del usuario)', () => {
     await waitFor(() => expect(getByText('Añadir categoría nueva')).toBeTruthy());
     fireEvent.press(getByText('+ Nueva categoría'));
     await waitFor(() => expect(getByText('Nueva categoría')).toBeTruthy());
-    fireEvent.changeText(getByPlaceholderText('Mascotas'), 'Mascotas');
+    fireEvent.changeText(getByPlaceholderText('Compras'), 'Mascotas');
     fireEvent.press(getByLabelText('Guardar'));
     await waitFor(() => expect(getByText('Mascotas')).toBeTruthy());
     // Segunda categoría distinta (botón + del header)
     fireEvent.press(getByLabelText('Nueva categoría'));
     await waitFor(() => expect(getByText('Nueva categoría')).toBeTruthy());
-    fireEvent.changeText(getByPlaceholderText('Mascotas'), 'Jardín');
+    fireEvent.changeText(getByPlaceholderText('Compras'), 'Jardín');
     fireEvent.press(getByLabelText('Guardar'));
     await waitFor(() => expect(getByText('Jardín')).toBeTruthy());
     // Renombrar Jardín → Mascotas debe fallar
     fireEvent.press(getByLabelText('Editar Jardín'));
     await waitFor(() => expect(getByText('Editar categoría')).toBeTruthy());
-    fireEvent.changeText(getByPlaceholderText('Mascotas'), 'mascotas');
+    fireEvent.changeText(getByPlaceholderText('Compras'), 'mascotas');
     fireEvent.press(getByLabelText('Guardar'));
     await waitFor(() => expect(getByText('Ya existe una categoría con ese nombre')).toBeTruthy());
     expect(queryByText('Jardín')).toBeTruthy();
@@ -148,7 +148,7 @@ describe('CategoriesScreen (categorías del usuario)', () => {
       await waitFor(() => expect(getByText('Añadir categoría nueva')).toBeTruthy());
       fireEvent.press(getByText('+ Nueva categoría'));
       await waitFor(() => expect(getByText('Nueva categoría')).toBeTruthy());
-      fireEvent.changeText(getByPlaceholderText('Mascotas'), 'Mascotas');
+      fireEvent.changeText(getByPlaceholderText('Compras'), 'Mascotas');
       fireEvent.press(getByLabelText('Guardar'));
       await waitFor(() => expect(getByText('Mascotas')).toBeTruthy());
       fireEvent.press(getByLabelText('Eliminar Mascotas'));
@@ -168,7 +168,7 @@ describe('CategoriesScreen (categorías del usuario)', () => {
       await waitFor(() => expect(getByText('Añadir categoría nueva')).toBeTruthy());
       fireEvent.press(getByText('+ Nueva categoría'));
       await waitFor(() => expect(getByText('Nueva categoría')).toBeTruthy());
-      fireEvent.changeText(getByPlaceholderText('Mascotas'), 'Mascotas');
+      fireEvent.changeText(getByPlaceholderText('Compras'), 'Mascotas');
       fireEvent.press(getByLabelText('Guardar'));
       await waitFor(() => expect(getByText('Mascotas')).toBeTruthy());
       fireEvent.press(getByLabelText('Eliminar Mascotas'));

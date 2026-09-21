@@ -51,10 +51,131 @@ describe('CategoryCarousel color de la categoría', () => {
         />
       </Provider>,
     );
-    expect(tree.getByText('10%')).toBeTruthy();
-    // Única barra → queda seleccionada (pastel 0.55 del rojo elegido)
-    expect(bgOf(tree, 'bar-COMPRAS')).toBe(pastel('#ef4444', 0.55, 'COMPRAS'));
+    expect(tree.getAllByText('10%').length).toBeGreaterThanOrEqual(1);
+    // Única barra → queda seleccionada: pista clara + relleno 0.55 del rojo elegido
+    expect(bgOf(tree, 'bar-COMPRAS')).toBe(pastel('#ef4444', 0.22, 'COMPRAS'));
+    expect(bgOf(tree, 'fill-COMPRAS')).toBe(pastel('#ef4444', 0.55, 'COMPRAS'));
     expect(barColor('COMPRAS')).toBe('#ec4899');
+  });
+
+  it('controlado sin filtro: píldora compacta con % y tap filtra', () => {
+    setCustomCategories([{ ...COMPRAS, color: '#ef4444' }]);
+    const testStore = configureStore({
+      reducer: { categories: categoriesReducer },
+      middleware: (g) => g({ serializableCheck: false }),
+    });
+    const onSelect = jest.fn();
+    const tree = render(
+      <Provider store={testStore}>
+        <CategoryCarousel
+          budgets={[{ category: 'COMPRAS', currency: 'BOB', limit: 400, spent: 40, pct: 0.1 }]}
+          summary={[{ category: 'COMPRAS', currency: 'BOB', total: 40 }]}
+          selectedId={null}
+          onSelect={onSelect}
+        />
+      </Provider>,
+    );
+    // Compacta por defecto pero con % visible
+    expect(tree.getAllByText('10%').length).toBeGreaterThanOrEqual(1);
+    expect(tree.getByTestId('compact-COMPRAS')).toBeTruthy();
+    fireEvent.press(tree.getByLabelText('Ver Compras'));
+    expect(onSelect).toHaveBeenCalledWith('COMPRAS');
+  });
+
+  it('el relleno muestra el % del budget y se capa al 100% si se pasa', () => {
+    setCustomCategories([{ ...COMPRAS, color: '#ef4444' }]);
+    const testStore = configureStore({
+      reducer: { categories: categoriesReducer },
+      middleware: (g) => g({ serializableCheck: false }),
+    });
+    const tree = render(
+      <Provider store={testStore}>
+        <CategoryCarousel
+          budgets={[{ category: 'COMPRAS', currency: 'BOB', limit: 400, spent: 0, pct: 0 }]}
+          summary={[{ category: 'COMPRAS', currency: 'BOB', total: 308 }]}
+          selectedId="COMPRAS"
+          onSelect={() => {}}
+        />
+      </Provider>,
+    );
+    // 308 de 400 = 77%: el relleno lo muestra visual, el texto dice lo que falta
+    const fill = tree.getByTestId('fill-COMPRAS');
+    const flatFill = [fill.props.style].flat(Infinity);
+    expect(flatFill).toContainEqual(expect.objectContaining({ width: '77%' }));
+    expect(tree.getAllByText('77%').length).toBeGreaterThanOrEqual(1);
+    expect(tree.getByText(/Falta 23%/)).toBeTruthy();
+    // Sin dash: solo pista + relleno
+    expect(tree.queryByTestId('dash-COMPRAS')).toBeNull();
+  });
+
+  it('sobre el límite: relleno al 100% y aviso', () => {
+    setCustomCategories([{ ...COMPRAS, color: '#ef4444' }]);
+    const testStore = configureStore({
+      reducer: { categories: categoriesReducer },
+      middleware: (g) => g({ serializableCheck: false }),
+    });
+    const tree = render(
+      <Provider store={testStore}>
+        <CategoryCarousel
+          budgets={[{ category: 'COMPRAS', currency: 'BOB', limit: 400, spent: 0, pct: 0 }]}
+          summary={[{ category: 'COMPRAS', currency: 'BOB', total: 500 }]}
+          selectedId="COMPRAS"
+          onSelect={() => {}}
+        />
+      </Provider>,
+    );
+    const fill = tree.getByTestId('fill-COMPRAS');
+    const flatFill = [fill.props.style].flat(Infinity);
+    expect(flatFill).toContainEqual(expect.objectContaining({ width: '100%' }));
+    expect(tree.getByText(/\+25% sobre/)).toBeTruthy();
+  });
+
+  it('sin budget: expandida sólida, sin relleno ni rayitas', () => {
+    setCustomCategories([{ ...COMPRAS, color: '#ef4444' }]);
+    const testStore = configureStore({
+      reducer: { categories: categoriesReducer },
+      middleware: (g) => g({ serializableCheck: false }),
+    });
+    const tree = render(
+      <Provider store={testStore}>
+        <CategoryCarousel
+          budgets={[]}
+          summary={[{ category: 'COMPRAS', currency: 'BOB', total: 40 }]}
+          selectedId="COMPRAS"
+          onSelect={() => {}}
+        />
+      </Provider>,
+    );
+    expect(tree.queryByTestId('fill-COMPRAS')).toBeNull();
+    expect(tree.queryByTestId('dash-COMPRAS')).toBeNull();
+    expect(bgOf(tree, 'bar-COMPRAS')).toBe(pastel('#ef4444', 0.55, 'COMPRAS'));
+  });
+
+  it('long-press avisa la categoría y no alterna el filtro al soltar', () => {
+    setCustomCategories([{ ...COMPRAS, color: '#ef4444' }]);
+    const testStore = configureStore({
+      reducer: { categories: categoriesReducer },
+      middleware: (g) => g({ serializableCheck: false }),
+    });
+    const onSelect = jest.fn();
+    const onLongPressCategory = jest.fn();
+    const tree = render(
+      <Provider store={testStore}>
+        <CategoryCarousel
+          budgets={[]}
+          summary={[{ category: 'COMPRAS', currency: 'BOB', total: 40 }]}
+          selectedId={null}
+          onSelect={onSelect}
+          onLongPressCategory={onLongPressCategory}
+        />
+      </Provider>,
+    );
+    const bar = tree.getByLabelText('Ver Compras');
+    fireEvent(bar, 'longPress');
+    expect(onLongPressCategory).toHaveBeenCalledWith('COMPRAS');
+    // El onPress que RN dispara al soltar tras el long-press se ignora
+    fireEvent.press(bar);
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it('barColor no depende del color guardado y cubre todas las sugerencias', () => {

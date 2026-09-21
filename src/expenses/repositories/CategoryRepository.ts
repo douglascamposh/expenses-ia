@@ -1,6 +1,9 @@
 import { getDatabase } from '@/database/sqlite';
-import { SYSTEM_CATEGORY, isValidCategoryKind, type CategoryConfig, type CategoryKind } from '../categories/expenseCategories';
+import { SYSTEM_CATEGORY, isValidCategoryKind, normCategoryLabel, slugifyCategory, type CategoryConfig, type CategoryKind } from '../categories/expenseCategories';
 import { ExpenseCategory } from '../categories/expenseCategories';
+
+/** Re-export de helpers puros (viven en expenseCategories para no depender del repo). */
+export { normCategoryLabel, slugifyCategory };
 
 export interface CustomCategoryInput {
   label: string;
@@ -31,29 +34,7 @@ function rowToConfig(row: Record<string, unknown>): CategoryConfig {
   };
 }
 
-/** "Mascotas" → MASCOTAS: mayúsculas, sin espacios ni signos. */
-export function slugifyCategory(label: string): string {
-  const slug = (label ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 24);
-  return slug || 'CUSTOM';
-}
-
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
-
-/** Normaliza para comparar duplicados: sin tildes, minúsculas, sin espacios extra. */
-export function normCategoryLabel(label: string): string {
-  return (label ?? '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ');
-}
 
 function validate(input: CustomCategoryInput): string | null {
   if (!input || typeof input !== 'object') return 'Categoría inválida';

@@ -16,6 +16,7 @@ import { flagForSpeech } from '@/services/voice-locale';
 import { getAllCategories, resolveCategoryId } from '@/expenses/categories/expenseCategories';
 import { isValidCurrency, isValidKind, isValidPaymentMethod, type NewExpense } from '@/expenses/models/Expense';
 import { validateExpenseCommand } from '@/expenses/services/ExpenseService';
+import { todayLocalISO } from '@/expenses/utils/format';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setPendingQueue } from '@/store/expensesSlice';
 import { useTheme } from '@/hooks/use-theme';
@@ -72,7 +73,7 @@ export default function VoiceTextScreen() {
             category: resolved,
             kind: isValidKind(rawKind) ? rawKind : 'EXPENSE',
             description: String(rawObj.description || 'Gasto'),
-            date: String(rawObj.date || new Date().toISOString().split('T')[0]),
+            date: String(rawObj.date || todayLocalISO()),
             paymentMethod: isValidPaymentMethod(String(rawMethod || 'CASH')) ? String(rawMethod) : 'CASH',
             confidence: rawObj.confidence as number | undefined,
           },
@@ -86,7 +87,7 @@ export default function VoiceTextScreen() {
             category: resolveCategoryId(rawObj.category) as NewExpense['category'],
             kind: 'EXPENSE',
             description: String(rawObj.description || ''),
-            date: String(rawObj.date || new Date().toISOString().split('T')[0]),
+            date: String(rawObj.date || todayLocalISO()),
             paymentMethod: 'CASH',
           });
       }

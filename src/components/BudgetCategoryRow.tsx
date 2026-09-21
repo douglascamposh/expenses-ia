@@ -24,6 +24,10 @@ type Props = {
   onTrashPress: (category: string) => void;
   swipeRefs: { current: Map<string, Swipeable | null> };
   onOpen: (id: string) => void;
+  /** La fila reporta su Y dentro del scroll padre (para llevarla sobre el teclado). */
+  onRowLayout?: (y: number) => void;
+  /** El campo de monto tomó foco (el padre decide si hace scroll). */
+  onInputFocus?: () => void;
 };
 
 /**
@@ -41,6 +45,8 @@ export function BudgetCategoryRow({
   onTrashPress,
   swipeRefs,
   onOpen,
+  onRowLayout,
+  onInputFocus,
 }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -65,6 +71,11 @@ export function BudgetCategoryRow({
 
   const amount = parseFloat((amountText ?? '').replace(',', '.')) || 0;
   const invalid = amount <= 0;
+
+  /** Y de la fila dentro del scroll padre (hijas directas del contenido). */
+  const reportLayout = (e: { nativeEvent: { layout: { y: number } } }) => {
+    onRowLayout?.(e.nativeEvent.layout.y);
+  };
 
   const handleSave = () => {
     setAttempted(true);
@@ -99,6 +110,7 @@ export function BudgetCategoryRow({
           <TextInput
             value={amountText}
             onChangeText={setAmountText}
+            onFocus={() => onInputFocus?.()}
             keyboardType="numeric"
             placeholder="0"
             placeholderTextColor={theme.textSecondary}
@@ -124,7 +136,9 @@ export function BudgetCategoryRow({
     </View>
   );
 
-  if (!progress) return body;
+  // Wrapper con onLayout: la fila es hija directa del contenido del scroll,
+  // así el Y reportado sirve para llevarla sobre el teclado al enfocar.
+  if (!progress) return <View onLayout={reportLayout} collapsable={false}>{body}</View>;
 
   const renderRightActions = (
     _progressAnim: Animated.AnimatedInterpolation<number>,
@@ -141,6 +155,7 @@ export function BudgetCategoryRow({
   );
 
   return (
+    <View onLayout={reportLayout} collapsable={false}>
     <Swipeable
       ref={ref}
       friction={2}
@@ -151,6 +166,7 @@ export function BudgetCategoryRow({
     >
       {body}
     </Swipeable>
+    </View>
   );
 }
 

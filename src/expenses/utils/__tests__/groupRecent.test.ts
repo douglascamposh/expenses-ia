@@ -33,8 +33,20 @@ describe('groupRecent', () => {
     expect(sections).toHaveLength(2);
     expect(sections[0].label).toBe('hoy');
     expect(sections[0].items).toHaveLength(2);
-    expect(sections[0].totals.BOB).toBe(150);
+    // Neto: los gastos restan
+    expect(sections[0].totals.BOB).toBe(-150);
     expect(sections[1].label).toBe('ayer');
+  });
+
+  it('neto del día: ingreso suma y gasto resta (no se suman como positivos)', () => {
+    const income: Expense = { ...exp('i', '2026-09-12', 3000), kind: 'INCOME', description: 'Sueldo' };
+    const sections = groupRecent(
+      [exp('a', '2026-09-12', 500), income],
+      5, 30, '2026-09-12',
+    );
+    expect(sections).toHaveLength(1);
+    // 3000 - 500 = 2500 (antes daba 3500 y la UI le colgaba un "-" fijo)
+    expect(sections[0].totals.BOB).toBe(2500);
   });
 
   it('corta a 5 fechas y 30 items', () => {

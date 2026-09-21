@@ -2,6 +2,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 
 import { getAuthToken } from './auth';
 import { logApiError, logApiWarn } from '@/utils/debug-log';
+import { todayLocalISO } from '@/expenses/utils/format';
 
 /**
  * Expense API — envía audio a endpoint cloud y recibe gastos estructurados.
@@ -33,26 +34,14 @@ export const API_ENV: ApiEnv =
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+/** Base del backend para otros servicios (p. ej. /api/ask de IA). */
+export function getApiBaseUrl(): string {
+  return API_BASE_URL;
+}
+
 export const ANALYZE_ENDPOINT = `${API_BASE_URL}/api/analyze`;
 
 export const ANALYZE_TEXT_ENDPOINT = `${API_BASE_URL}/api/analyze-text`;
-
-export const EMBED_ENDPOINT = `${API_BASE_URL}/api/embed`;
-
-export type EmbedResult = {
-  vector: Float32Array;
-  model: string;
-  dims: number;
-};
-
-export class EmbedError extends Error {
-  status?: number;
-  constructor(message: string, status?: number) {
-    super(message);
-    this.name = 'EmbedError';
-    this.status = status;
-  }
-}
 
 export type Expense = {
   amount?: number;
@@ -275,7 +264,7 @@ export async function analyzeAudio(
     } as unknown as Blob);
   }
   formData.append('model', model);
-  const localDate = new Date().toISOString().split('T')[0];
+  const localDate = todayLocalISO();
   formData.append('currentDate', localDate);
   if (categories && categories.length > 0) {
     formData.append('categories', JSON.stringify(categories));
@@ -382,7 +371,7 @@ export async function analyzeText(
     text: clean,
     categories: categories ?? [],
     model,
-    currentDate: currentDate ?? new Date().toISOString().split('T')[0],
+    currentDate: currentDate ?? todayLocalISO(),
   };
 
   let response: Response;
@@ -426,59 +415,4 @@ export async function analyzeText(
   console.log('Gastos detectados (texto):', expenses);
   const latency = !Array.isArray(json) ? (json as AnalyzeResponse).latency : undefined;
   return { expenses, raw: json, latency };
-}
-
-/**
- * Genera el embedding de un texto vía backend.
- * Contrato: POST { text } → { embedding: number[], model?: string, dims?: number }.
- * Defensivo: acepta `embedding`/`vector`/`data` como vector y deriva dims/model si faltan.
- */
-export async function embedText(text: string, endpoint: string = EMBED_ENDPOINT): Promise<EmbedResult> {
-  if (!text || typeof text !== 'string' || text.trim().length === 0) {
-    throw new EmbedError('Texto vacío para embedding');
-  }
-  let response: Response;
-  try {
-    response = await fetchWithAuth(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ text }),
-    });
-  } catch (e) {
-    logApiError('expense-api/embedText', e, { endpoint });
-    throw new EmbedError((e as Error).message ?? 'Error de red al generar embedding');
-  }
-  let json: Record<string, unknown>;
-  try {
-    json = (await response.json()) as Record<string, unknown>;
-  } catch (e) {
-    const err = new EmbedError('Respuesta inválida del endpoint de embeddings', response.status);
-    logApiError('expense-api/embedText', e, { endpoint, status: response.status, cause: err.message });
-    throw err;
-  }
-  if (!response.ok) {
-    const errMsg = typeof json?.error === 'string' ? json.error : undefined;
-    const authProblem = response.status === 401 || isExpiredTokenBody(json);
-    const err = new EmbedError(
-      authProblem ? SESSION_INVALID_MESSAGE : errMsg || `Error ${response.status} generando embedding`,
-      response.status,
-    );
-    logApiError('expense-api/embedText', err, { endpoint, body: JSON.stringify(json).slice(0, 500) });
-    throw err;
-  }
-  const raw = json.embedding ?? json.vector ?? json.data;
-  if (!Array.isArray(raw) || raw.length === 0) {
-    throw new EmbedError('El backend no devolvió embedding');
-  }
-  const vector = Float32Array.from(raw, (v) => {
-    const n = Number(v);
-    if (!isFinite(n)) throw new EmbedError('Embedding con valores no numéricos');
-    return n;
-  });
-  const dims = typeof json.dims === 'number' && json.dims > 0 ? json.dims : vector.length;
-  if (dims !== vector.length) {
-    throw new EmbedError(`Dims inconsistentes: esperado ${dims}, recibido ${vector.length}`);
-  }
-  const model = typeof json.model === 'string' && json.model.length > 0 ? json.model : 'backend-default';
-  return { vector, model, dims };
 }

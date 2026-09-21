@@ -61,6 +61,19 @@ describe('categories slice', () => {
     expect(isValidCategory('JARDIN')).toBe(true);
   });
 
+  it('createCategory conserva la creada aunque falle la re-lectura', async () => {
+    const store = makeStore();
+    (categoryRepository as unknown as { getCustom: () => Promise<never> }).getCustom = () =>
+      Promise.reject(new Error('db busy'));
+    const list = await store.dispatch(
+      createCategory({ label: 'Mascotas', emoji: '🐶', color: '#f97316' }),
+    ).unwrap();
+    // La creada está en el payload, el estado y el registro (nada se vacía)
+    expect(list.map((c) => String(c.id))).toContain('MASCOTAS');
+    expect(store.getState().categories.custom.map((c) => String(c.id))).toContain('MASCOTAS');
+    expect(isValidCategory('MASCOTAS')).toBe(true);
+  });
+
   it('createCategory rechaza nombres inválidos', async () => {
     const store = makeStore();
     await expect(store.dispatch(createCategory({ label: 'X', emoji: '🐶', color: '#f97316' })).unwrap()).rejects.toBeDefined();

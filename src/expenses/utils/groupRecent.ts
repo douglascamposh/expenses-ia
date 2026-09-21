@@ -1,4 +1,5 @@
 import type { Expense } from '../models/Expense';
+import { todayLocalISO } from './format';
 
 export interface RecentSection {
   /** YYYY-MM-DD */
@@ -15,15 +16,15 @@ export const MAX_RECENT_DATES = 5;
 export const MAX_RECENT_ITEMS = 30;
 
 export function dayLabel(date: string, lang: 'es' | 'en' = 'es', todayStr?: string): string {
-  const today = todayStr ?? new Date().toISOString().split('T')[0];
+  const today = todayStr ?? todayLocalISO();
   if (date === today) return lang === 'en' ? 'today' : 'hoy';
   const base = new Date(today + 'T12:00:00');
   const yesterday = new Date(base);
   yesterday.setDate(base.getDate() - 1);
-  if (date === yesterday.toISOString().split('T')[0]) return lang === 'en' ? 'yesterday' : 'ayer';
+  if (date === todayLocalISO(yesterday)) return lang === 'en' ? 'yesterday' : 'ayer';
   const before = new Date(base);
   before.setDate(base.getDate() - 2);
-  if (date === before.toISOString().split('T')[0]) return lang === 'en' ? 'day before' : 'anteayer';
+  if (date === todayLocalISO(before)) return lang === 'en' ? 'day before' : 'anteayer';
   return new Date(date + 'T12:00:00').toLocaleDateString(lang === 'en' ? 'en-US' : 'es-BO', { day: 'numeric', month: 'short' });
 }
 
@@ -51,7 +52,8 @@ export function groupRecent(
       sections.push(sec);
     }
     sec.items.push(e);
-    sec.totals[e.currency] = (sec.totals[e.currency] ?? 0) + (e.amount ?? 0);
+    // Neto del día por moneda: ingresos suman, gastos restan (kind ausente = gasto).
+    sec.totals[e.currency] = (sec.totals[e.currency] ?? 0) + (e.kind === 'INCOME' ? 1 : -1) * (e.amount ?? 0);
     count += 1;
   }
   return sections;
