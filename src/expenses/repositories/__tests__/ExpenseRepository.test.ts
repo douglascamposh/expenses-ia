@@ -133,4 +133,39 @@ describe('InMemoryExpenseRepository', () => {
     expect(bob?.total).toBe(100);
     expect(usd?.total).toBe(50);
   });
+
+  it('sync: creado queda pending; markSynced lo limpia', async () => {
+    const repo = new InMemoryExpenseRepository();
+    const e = makeExpense({ id: 's1' });
+    await repo.create(e);
+    expect(await repo.getPendingUpserts()).toHaveLength(1);
+    await repo.markSynced([e.id]);
+    expect(await repo.getPendingUpserts()).toHaveLength(0);
+  });
+
+  it('sync: softDelete oculta y deja tombstone pendiente', async () => {
+    const repo = new InMemoryExpenseRepository();
+    const e = makeExpense({ id: 's2' });
+    await repo.create(e);
+    await repo.softDelete(e.id);
+    expect(await repo.getById(e.id)).toBeNull();
+    expect(await repo.getAll()).toHaveLength(0);
+    expect(await repo.getPendingUpserts()).toHaveLength(0);
+    const dels = await repo.getPendingDeletes();
+    expect(dels).toHaveLength(1);
+    expect(dels[0].id).toBe('s2');
+  });
+
+  it('sync: upsertFromCloud inserta como synced y gcTombstones purga viejas', async () => {
+    const repo = new InMemoryExpenseRepository();
+    const e = makeExpense({ id: 'c1' });
+    await repo.upsertFromCloud(e, false);
+    expect(await repo.getPendingUpserts()).toHaveLength(0);
+    expect((await repo.getById('c1'))?.amount).toBe(e.amount);
+    await repo.softDelete('c1');
+    await repo.markSynced(['c1']);
+    expect(await repo.gcTombstones('2000-01-01T00:00:00.000Z')).toBe(0);
+    expect(await repo.gcTombstones('2999-01-01T00:00:00.000Z')).toBe(1);
+    expect(await repo.getPendingDeletes()).toHaveLength(0);
+  });
 });

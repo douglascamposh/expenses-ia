@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Check, ChevronLeft, ChevronRight, CircleDollarSign, FileText, Globe, Info, Layers, Moon, PiggyBank, Repeat, Shield, Cpu, TrendingUp } from 'lucide-react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Check, ChevronLeft, ChevronRight, CircleDollarSign, Crown, FileText, Globe, Info, Layers, Moon, PiggyBank, Repeat, Shield, Cpu, TrendingUp, UserRound } from 'lucide-react-native';
 import { ThemedView } from '@/components/themed-view';
 import { CurrencyModal } from '@/components/CurrencyModal';
 import { Modal } from '@/components/ui/Modal';
@@ -13,7 +13,14 @@ import { useTheme } from '@/hooks/use-theme';
 import { fetchExpenses } from '@/store/expensesSlice';
 import { setDefaultCurrency, setLanguage, setSkipIncome, setThemeMode, type LanguageSetting, type ThemeModeSetting } from '@/store/settingsSlice';
 import { useTranslation } from '@/i18n/useTranslation';
+import { getGoogleAccount } from '@/services/auth';
 import { currencyName } from '@/expenses/utils/currencies';
+
+/** Etiqueta de cuenta: email o nombre si hay Google, si no null (→ Invitado). */
+function accountLabel(): string | null {
+  const a = getGoogleAccount();
+  return a?.email ?? a?.displayName ?? null;
+}
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -28,6 +35,11 @@ export default function SettingsScreen() {
   const theme = useTheme();
   const [currencyVisible, setCurrencyVisible] = useState(false);
   const [selectVisible, setSelectVisible] = useState<'language' | 'theme' | null>(null);
+  const [account, setAccount] = useState<string | null>(() => accountLabel());
+  // Al volver de /account: refresca si se vinculó Google.
+  useFocusEffect(useCallback(() => {
+    setAccount(accountLabel());
+  }, []));
 
   const languageLabel =
     language === 'es' ? t('settings_languageEs') : language === 'en' ? t('settings_languageEn') : t('settings_languageSystem');
@@ -49,6 +61,11 @@ export default function SettingsScreen() {
           <Text style={[styles.title, { color: theme.text }]}>{t('settings_title')}</Text>
         </View>
 
+        <Text variant="small" color="textSecondary" style={styles.sectionLabel}>{t('settings_account')}</Text>
+        <View style={styles.list}>
+          <SettingRow icon={UserRound} label={t('settings_account')} subtitle={account ?? t('settings_guest')} onPress={() => router.push('/account' as never)} testID="settings-account-row" />
+        </View>
+
         <Text variant="small" color="textSecondary" style={styles.sectionLabel}>{t('settings_content')}</Text>
         <View style={styles.list}>
           <SettingRow icon={Moon} label={t('settings_appearance')} subtitle={themeLabel} onPress={() => setSelectVisible('theme')} />
@@ -66,11 +83,16 @@ export default function SettingsScreen() {
           <SettingRow icon={Cpu} label={t('settings_aiDiagnostics')} />
         </View>
 
+        <Text variant="small" color="textSecondary" style={styles.sectionLabel}>{t('settings_plan')}</Text>
+        <View style={styles.list}>
+          <SettingRow icon={Crown} label={t('settings_subscribe')} subtitle={t('settings_subscribeSub')} onPress={() => router.push('/pro' as never)} testID="settings-subscribe-row" />
+        </View>
+
         <Text variant="small" color="textSecondary" style={styles.sectionLabel}>{t('settings_about')}</Text>
         <View style={styles.list}>
           <SettingRow icon={Info} label={t('settings_appVersion')} subtitle="1.0.0" chevron={false} />
           <SettingRow icon={Shield} label={t('settings_privacy')} />
-          <SettingRow icon={FileText} label={t('settings_terms')} />
+          <SettingRow icon={FileText} label={t('settings_terms')} onPress={() => router.push('/terms' as never)} testID="settings-terms-row" />
         </View>
       </ScrollView>
 
@@ -118,12 +140,12 @@ export default function SettingsScreen() {
   );
 }
 
-function SettingRow({ icon: Icon, label, subtitle, chevron = true, onPress }: { icon: React.ComponentType<{ size?: number; color?: string }>; label: string; subtitle?: string; chevron?: boolean; onPress?: () => void }) {
+function SettingRow({ icon: Icon, label, subtitle, chevron = true, onPress, testID }: { icon: React.ComponentType<{ size?: number; color?: string }>; label: string; subtitle?: string; chevron?: boolean; onPress?: () => void; testID?: string }) {
   const theme = useTheme();
   return (
-    <Pressable style={styles.row} accessibilityRole="button" onPress={onPress}>
-      <View style={[styles.iconBox, { backgroundColor: theme.backgroundSelected }]}>
-        <Icon size={24} color={theme.primary} />
+    <Pressable style={styles.row} accessibilityRole="button" onPress={onPress} testID={testID}>
+      <View style={styles.iconBox}>
+        <Icon size={24} color="#7C3AED" />
       </View>
       <View style={styles.labelCol}>
         <Text variant="smallBold" style={styles.rowLabel}>{label}</Text>
@@ -142,7 +164,6 @@ function SelectModal({ visible, title, options, selected, onClose, onSelect }: {
   onClose: () => void;
   onSelect: (id: string) => void;
 }) {
-  const theme = useTheme();
   return (
     <Modal visible={visible} variant="center" animation="fade" overlayOpacity={0.45} onDismiss={onClose}>
       <View style={styles.selectBox}>
@@ -156,10 +177,10 @@ function SelectModal({ visible, title, options, selected, onClose, onSelect }: {
               accessibilityLabel={o.label}
               accessibilityState={{ selected: active }}
               onPress={() => onSelect(o.id)}
-              style={[styles.selectRow, active && { backgroundColor: theme.primary + '1A' }]}
+              style={[styles.selectRow, active && { backgroundColor: 'rgba(124,58,237,0.10)' }]}
             >
               <Text variant="smallBold" style={styles.selectLabel}>{o.label}</Text>
-              {active && <Check size={18} color={theme.primary} />}
+              {active && <Check size={18} color="#7C3AED" />}
             </Pressable>
           );
         })}
@@ -177,7 +198,7 @@ const styles = StyleSheet.create({
   sectionLabel: { fontFamily: Fonts.sans },
   list: { gap: Spacing.one },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, paddingVertical: 14 },
-  iconBox: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  iconBox: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(124,58,237,0.12)' },
   labelCol: { flex: 1, gap: 2 },
   rowLabel: { fontFamily: Fonts.sans },
   selectBox: { width: '100%', gap: Spacing.two },

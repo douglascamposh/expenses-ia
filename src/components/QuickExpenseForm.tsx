@@ -315,9 +315,6 @@ export function QuickExpenseForm({ value, onChange, defaultCurrency, onSave, ini
         kindPreset={kind === 'INCOME' ? 'INGRESO' : 'GASTO'}
         onClose={() => setCreateOpen(false)}
         onSaved={(created) => {
-          // TODO-DEBUG: log temporal para bug "categoría no aparece" (quitar).
-          // eslint-disable-next-line no-console
-          console.log('[DBG-cat] onSaved', JSON.stringify(created));
           setCreateOpen(false);
           if (created) {
             // La categoría nueva manda: queda seleccionada y el form adopta

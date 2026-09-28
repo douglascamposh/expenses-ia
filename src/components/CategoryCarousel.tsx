@@ -310,6 +310,8 @@ const styles = StyleSheet.create({
   bar: {
     alignItems: 'center',
     justifyContent: 'center',
+    // Recorta el relleno absoluto al borde redondeado (sin esto se sale en nativo).
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,

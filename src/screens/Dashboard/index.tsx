@@ -69,6 +69,8 @@ export function DashboardScreen() {
   const [budgetToast, setBudgetToast] = useState<{ title: string; body: string } | null>(null);
   /** Avisos de la grabación/análisis de voz (error de servicio → tono error). */
   const [voiceToast, setVoiceToast] = useState<{ message: string; tone: 'info' | 'error' } | null>(null);
+  /** Confirmación al crear una categoría sugerida del onboarding. */
+  const [catToast, setCatToast] = useState<{ message: string; emoji: string } | null>(null);
   useBudgetAlerts(useCallback((title: string, body: string) => setBudgetToast({ title, body }), []));
   const dispatch = useAppDispatch();
   const recent = useAppSelector((s) => s.expenses.recent ?? []);
@@ -109,7 +111,7 @@ export function DashboardScreen() {
     (recent ?? []).length === 0 &&
     (budgets ?? []).length === 0;
   const onboardingSuggestions = useMemo(
-    () => getSuggestions().slice(0, 2),
+    () => getSuggestions().slice(0, 3),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [customCats.length],
   );
@@ -552,9 +554,9 @@ export function DashboardScreen() {
               <Text style={styles.welcomeSub}>{t('dashboard_welcomeSub')}</Text>
             </LinearGradient>
 
-            <View style={styles.onboardingRow}>
+            <View style={styles.onboardingColumn}>
               <View style={[styles.onboardingCard, { backgroundColor: theme.backgroundElement }]}>
-                <Text variant="smallBold">{t('dashboard_addCategories')}</Text>
+                <Text variant="h2">{t('dashboard_addCategories')}</Text>
                 <View style={styles.suggestRow}>
                   <Pressable
                     accessibilityRole="button"
@@ -562,7 +564,7 @@ export function DashboardScreen() {
                     onPress={() => router.push('/categories' as never)}
                     style={[styles.dashedCircle, { backgroundColor: theme.backgroundElement, borderColor: theme.textSecondary }]}
                   >
-                    <Plus size={20} color={theme.text} />
+                    <Plus size={22} color={theme.text} />
                   </Pressable>
                   {onboardingSuggestions.map((s) => (
                     <Pressable
@@ -572,6 +574,7 @@ export function DashboardScreen() {
                       onPress={() => {
                         void dispatch(createCategory({ label: s.label, emoji: s.emoji, color: s.color, kind: s.kind }))
                           .unwrap()
+                          .then(() => setCatToast({ message: t('dashboard_categoryCreated', { label: s.label }), emoji: s.emoji }))
                           .catch(() => {});
                       }}
                       style={[styles.suggestCircle, { backgroundColor: s.color + '33' }]}
@@ -581,52 +584,35 @@ export function DashboardScreen() {
                   ))}
                 </View>
               </View>
+              {!skipIncome && (
               <View style={[styles.onboardingCard, { backgroundColor: theme.backgroundElement }]}>
-                <Text variant="smallBold">{t('dashboard_addFirstExpense')}</Text>
-                <View style={styles.suggestRow}>
+                <View style={styles.incomeTopRow}>
+                  <View style={styles.currencyPill}>
+                    <Text variant="smallBold" style={styles.currencyPillText}>{heroSymbol}</Text>
+                  </View>
+                  <Text variant="small" color="textSecondary">{t('dashboard_addIncome')}</Text>
+                </View>
+                <View style={styles.incomeRow}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={t('dashboard_a11yAddManual')}
-                    onPress={() => openManual('EXPENSE')}
-                    style={[styles.suggestCircleWhite, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+                    accessibilityLabel={t('dashboard_a11yAddIncome')}
+                    onPress={() => openManual('INCOME')}
+                    style={styles.incomeAdd}
                   >
-                    <Plus size={20} color={theme.text} />
+                    <Text variant="smallBold" style={styles.incomeAddText}>{t('dashboard_addAction')}</Text>
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={t('dashboard_a11yVoiceRecord')}
-                    onPress={() => router.push('/voice-text' as never)}
-                    style={styles.suggestMic}
+                    accessibilityLabel={t('dashboard_a11ySkipIncome')}
+                    onPress={() => void dispatch(setSkipIncome(true))}
+                    style={styles.incomeSkip}
                   >
-                    <Mic size={20} color="#FFFFFF" />
+                    <Text variant="smallBold" style={styles.incomeSkipText}>{t('dashboard_skipIncome')}</Text>
                   </Pressable>
                 </View>
               </View>
+              )}
             </View>
-
-            {!skipIncome && (
-            <View style={[styles.incomeCard, { backgroundColor: theme.backgroundElement }]}>
-              <Text variant="small" color="textSecondary">{heroSymbol} <Text variant="h2">{t('dashboard_addIncome')}</Text></Text>
-              <View style={styles.incomeRow}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('dashboard_a11yAddIncome')}
-                  onPress={() => openManual('INCOME')}
-                  style={styles.incomeAdd}
-                >
-                  <Text variant="smallBold">{t('dashboard_addAction')}</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('dashboard_a11ySkipIncome')}
-                  onPress={() => void dispatch(setSkipIncome(true))}
-                  style={styles.incomeSkip}
-                >
-                  <Text variant="smallBold" style={styles.incomeSkipText}>{t('dashboard_skipIncome')}</Text>
-                </Pressable>
-              </View>
-            </View>
-            )}
           </View>
           )}
 
@@ -857,6 +843,13 @@ export function DashboardScreen() {
         tone="info"
         onDismiss={() => setBudgetToast(null)}
       />
+      <Toast
+        visible={catToast !== null}
+        message={catToast?.message ?? ''}
+        emoji={catToast?.emoji}
+        tone="info"
+        onDismiss={() => setCatToast(null)}
+      />
     </ThemedView>
   );
 }
@@ -867,26 +860,24 @@ const styles = StyleSheet.create({
   scroll: { padding: Spacing.four, gap: 8, paddingBottom: 100 },
   carouselBleed: { marginHorizontal: -Spacing.four },
   onboarding: { gap: Spacing.three },
-  welcomeCard: { borderRadius: 24, padding: Spacing.four, gap: 2 },
-  welcomeTitle: { fontSize: 26, lineHeight: 32, fontWeight: '800', fontFamily: Fonts.sans },
-  welcomeSub: { fontSize: 15, fontFamily: Fonts.sans, color: 'rgba(255,255,255,0.85)' },
-  onboardingRow: { flexDirection: 'row', gap: Spacing.two },
-  onboardingCard: { flex: 1, borderRadius: 20, padding: Spacing.three, gap: Spacing.two },
-  suggestRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', rowGap: 8 },
+  welcomeCard: { borderRadius: 28, padding: Spacing.four, gap: 4 },
+  welcomeTitle: { fontSize: 28, lineHeight: 34, fontWeight: '800', fontFamily: Fonts.sans },
+  welcomeSub: { fontSize: 16, fontFamily: Fonts.sans, color: 'rgba(255,255,255,0.85)' },
+  onboardingColumn: { flexDirection: 'column', gap: Spacing.three },
+  onboardingCard: { borderRadius: 24, padding: Spacing.four, gap: Spacing.three },
+  suggestRow: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap', rowGap: 12 },
   dashedCircle: {
-    width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
+    width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderStyle: 'dashed',
   },
-  suggestCircle: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  suggestEmoji: { fontSize: 24, lineHeight: 30 },
-  suggestCircleWhite: {
-    width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1,
-  },
-  suggestMic: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F0524D' },
-  incomeCard: { borderRadius: 20, padding: Spacing.three, gap: Spacing.two },
+  suggestCircle: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
+  suggestEmoji: { fontSize: 30, lineHeight: 36 },
   incomeRow: { flexDirection: 'row', gap: 8 },
+  incomeTopRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  currencyPill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4, backgroundColor: 'rgba(45,212,191,0.16)' },
+  currencyPillText: { color: '#2DD4BF' },
   incomeAdd: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 16, backgroundColor: '#D9F19A', alignItems: 'center', justifyContent: 'center' },
+  incomeAddText: { color: '#101828' },
   incomeSkip: { flex: 1, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 16, backgroundColor: '#2B2B2B', alignItems: 'center', justifyContent: 'center' },
   incomeSkipText: { color: '#FFFFFF' },
   // Top bar mockup
@@ -900,9 +891,11 @@ const styles = StyleSheet.create({
   catFilterEmoji: { fontSize: 18, fontFamily: Fonts.sans },
   catFilterX: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' },
   
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.two },
   sectionHeaderRight: { flexDirection: 'row', gap: Spacing.three, alignItems: 'center' },
   dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.two, marginBottom: Spacing.one },
   dayPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999 },
+  list: { gap: Spacing.two },
   emptyCard: { borderRadius: 16, padding: Spacing.four, alignItems: 'center', gap: Spacing.two, borderWidth: 1 },
   emptyHint: { textAlign: 'center', fontFamily: Fonts.sans },
   error: { color: '#EF4444', fontFamily: Fonts.sans },

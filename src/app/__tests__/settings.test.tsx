@@ -77,4 +77,44 @@ describe('Settings budgets', () => {
     fireEvent.press(getByLabelText('Usar USD'));
     await waitFor(() => expect(getByText('dólar estadounidense · USD')).toBeTruthy());
   });
+
+  it('la fila Hazte Pro navega a la pantalla Pro', async () => {
+    const { getByTestId } = renderWithStore();
+    await waitFor(() => expect(getByTestId('settings-subscribe-row')).toBeTruthy());
+    fireEvent.press(getByTestId('settings-subscribe-row'));
+    expect(mockPush).toHaveBeenCalledWith('/pro');
+  });
+
+  it('la fila Cuenta navega a la pantalla de cuenta', async () => {
+    const { getByTestId } = renderWithStore();
+    await waitFor(() => expect(getByTestId('settings-account-row')).toBeTruthy());
+    fireEvent.press(getByTestId('settings-account-row'));
+    expect(mockPush).toHaveBeenCalledWith('/account');
+  });
+
+  it('la fila Términos navega a la pantalla de términos', async () => {
+    const { getByTestId } = renderWithStore();
+    await waitFor(() => expect(getByTestId('settings-terms-row')).toBeTruthy());
+    fireEvent.press(getByTestId('settings-terms-row'));
+    expect(mockPush).toHaveBeenCalledWith('/terms');
+  });
+
+  it('la fila Cuenta muestra el email si hay Google vinculado', async () => {
+    const { getAuth } = jest.requireMock('@react-native-firebase/auth') as { getAuth: jest.Mock };
+    getAuth.mockReturnValue({
+      currentUser: {
+        uid: 'u1',
+        email: 'a@b.com',
+        providerData: [{ providerId: 'google.com', email: 'a@b.com', displayName: 'A' }],
+      },
+    });
+    try {
+      const { getByTestId, getByText, queryByText } = renderWithStore();
+      await waitFor(() => expect(getByTestId('settings-account-row')).toBeTruthy());
+      expect(getByText('a@b.com')).toBeTruthy();
+      expect(queryByText('Invitado')).toBeNull();
+    } finally {
+      getAuth.mockReturnValue({ currentUser: { uid: 'test-uid' } });
+    }
+  });
 });

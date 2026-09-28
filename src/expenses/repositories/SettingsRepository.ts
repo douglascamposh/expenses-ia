@@ -13,6 +13,8 @@ export const SETTING_KEYS = {
   budgetAlertsEnabled: 'budgetAlertsEnabled',
   budgetAlertThreshold: 'budgetAlertThreshold',
   budgetAlertNotified: 'budgetAlertNotified',
+  lastSyncPulledAt: 'lastSyncPulledAt',
+  syncDeviceId: 'syncDeviceId',
 } as const;
 
 export class SqliteSettingsRepository implements SettingsRepository {

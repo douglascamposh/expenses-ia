@@ -96,7 +96,7 @@ export const SYSTEM_CATEGORY: CategoryConfig = {
  * No existen en el registro hasta que se crean.
  */
 export const SUGGESTED_CATEGORIES: CategoryConfig[] = [
-  { id: 'COMER_FUERA' as ExpenseCategory, label: 'Comer fuera', icon: 'fork.knife', emoji: '🍔', color: '#f97316', kind: 'GASTO' },
+  { id: 'COMER_FUERA' as ExpenseCategory, label: 'Comer fuera', icon: 'fork.knife', emoji: '🍕', color: '#f97316', kind: 'GASTO' },
   { id: 'TRANSPORTE' as ExpenseCategory, label: 'Transporte', icon: 'car.fill', emoji: '🚕', color: '#eab308', kind: 'GASTO' },
   { id: 'COMPRAS' as ExpenseCategory, label: 'Compras', icon: 'bag.fill', emoji: '🛍', color: '#ec4899', kind: 'GASTO' },
   { id: 'SERVICIOS' as ExpenseCategory, label: 'Servicios', icon: 'doc.text.fill', emoji: '🧾', color: '#64748b', kind: 'GASTO' },

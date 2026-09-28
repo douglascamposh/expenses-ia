@@ -5,7 +5,7 @@ let db: SQLite.SQLiteDatabase | null = null;
 let dbInit: Promise<SQLite.SQLiteDatabase> | null = null;
 
 const DB_NAME = 'expenses.db';
-const DB_VERSION = 10;
+const DB_VERSION = 11;
 
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (db) return db;
@@ -334,6 +334,26 @@ async function migrate(database: SQLite.SQLiteDatabase) {
     await database.runAsync('INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (?, ?)', [10, new Date().toISOString()]);
   }
 
+  if (current < 11) {
+    // Sync con la nube: cola de pendientes + borrado lógico (tombstones).
+    // ADD COLUMN con DEFAULT rellena las filas existentes: todo lo previo
+    // queda 'pending' para subirlo en la primera sincronización.
+    try {
+      await database.execAsync(`ALTER TABLE expenses ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending';`);
+    } catch (e) {
+      const msg = String((e as Error)?.message ?? e ?? '').toLowerCase();
+      if (!msg.includes('duplicate column')) throw e;
+    }
+    try {
+      await database.execAsync(`ALTER TABLE expenses ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0;`);
+    } catch (e) {
+      const msg = String((e as Error)?.message ?? e ?? '').toLowerCase();
+      if (!msg.includes('duplicate column')) throw e;
+    }
+    await database.execAsync(`CREATE INDEX IF NOT EXISTS idx_expenses_sync ON expenses(sync_status, updated_at);`);
+    await database.runAsync('INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (?, ?)', [11, new Date().toISOString()]);
+  }
+
   // Reparación defensiva (corre siempre): si una migración vieja quedó marcada
   // como aplicada sin crear sus columnas (p. ej. v8 interrumpida → la app
   // fallaba con "no such column budget_amount"), se agregan aquí.
@@ -342,6 +362,8 @@ async function migrate(database: SQLite.SQLiteDatabase) {
   await ensureColumn(database, 'custom_categories', 'budget_amount', `budget_amount REAL NOT NULL DEFAULT 0`);
   await ensureColumn(database, 'custom_categories', 'budget_currency', `budget_currency TEXT NOT NULL DEFAULT 'BOB'`);
   await ensureColumn(database, 'expenses', 'recurring_id', `recurring_id TEXT`);
+  await ensureColumn(database, 'expenses', 'sync_status', `sync_status TEXT NOT NULL DEFAULT 'pending'`);
+  await ensureColumn(database, 'expenses', 'is_deleted', `is_deleted INTEGER NOT NULL DEFAULT 0`);
 }
 
 /**

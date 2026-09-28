@@ -47,6 +47,7 @@ beforeEach(async () => {
   (expenseRepository as unknown as InMemoryExpenseRepository).getByMonthRange = memExp.getByMonthRange.bind(memExp);
   (expenseRepository as unknown as InMemoryExpenseRepository).getCategorySummary = memExp.getCategorySummary.bind(memExp);
   (expenseRepository as unknown as InMemoryExpenseRepository).delete = memExp.delete.bind(memExp);
+  (expenseRepository as unknown as InMemoryExpenseRepository).softDelete = memExp.softDelete.bind(memExp);
   (expenseRepository as unknown as InMemoryExpenseRepository).update = memExp.update.bind(memExp);
   (expenseRepository as unknown as InMemoryExpenseRepository).clearAll = memExp.clearAll.bind(memExp);
   (budgetRepository as unknown as InMemoryBudgetRepository).getProgress = memBud.getProgress.bind(memBud);

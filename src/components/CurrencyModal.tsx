@@ -90,9 +90,9 @@ export function CurrencyModal({ visible, selected, onClose, onSelect }: Props) {
                 accessibilityLabel={t('currencyModal_use', { cur })}
                 accessibilityState={{ selected: active }}
                 onPress={() => onSelect(cur)}
-                style={[styles.row, active && { backgroundColor: theme.primary + '1A' }]}
+                style={[styles.row, active && { backgroundColor: 'rgba(124,58,237,0.10)' }]}
               >
-                <View style={[styles.symbolPill, { backgroundColor: theme.backgroundSelected }]}>
+                <View style={styles.symbolPill}>
                   <Text variant="smallBold">{getCurrencySymbol(cur)}</Text>
                 </View>
                 <View style={styles.meta}>
@@ -101,7 +101,7 @@ export function CurrencyModal({ visible, selected, onClose, onSelect }: Props) {
                     {currencyCountry(cur, lang)} · {cur}
                   </Text>
                 </View>
-                {active && <Check size={18} color={theme.primary} />}
+                {active && <Check size={18} color="#7C3AED" />}
               </Pressable>
             );
           })}
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   list: { maxHeight: 360, width: '100%' },
   listContent: { gap: 4, paddingBottom: Spacing.two },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12 },
-  symbolPill: { minWidth: 52, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  symbolPill: { minWidth: 52, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(124,58,237,0.12)' },
   meta: { flex: 1, gap: 2 },
 });
 

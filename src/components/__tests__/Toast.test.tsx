@@ -15,6 +15,14 @@ describe('Toast', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
+  it('con emoji muestra el emoji junto al mensaje', () => {
+    const { getByText } = render(
+      <Toast visible message="Categoría creada" emoji="🍕" tone="info" onDismiss={() => {}} />,
+    );
+    expect(getByText('Categoría creada')).toBeTruthy();
+    expect(getByText('🍕')).toBeTruthy();
+  });
+
   it('auto-cierre con timers', () => {
     jest.useFakeTimers();
     try {

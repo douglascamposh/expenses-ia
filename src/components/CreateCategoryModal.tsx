@@ -106,23 +106,12 @@ export function CreateCategoryModal({ visible, saving, initial, kindPreset = 'GA
       // La creada se busca en el resultado del thunk (no en el registro global):
       // así el id+kind llegan aunque el registro tarde en sincronizar.
       // Respaldo: registro global por si el payload no la trae.
-      // TODO-DEBUG: logs temporales para bug "categoría no aparece" (quitar).
-      // eslint-disable-next-line no-console
-      console.log('[DBG-cat] guardar', JSON.stringify({ label: input.label, kind: input.kind }));
       void dispatch(createCategory(input)).unwrap().then((list) => {
         const want = normCategoryLabel(input.label);
         const created = (list ?? []).find((c) => c && normCategoryLabel(c.label) === want)
           ?? getAllCategories().find((c) => c && normCategoryLabel(c.label) === want);
-        // eslint-disable-next-line no-console
-        console.log('[DBG-cat] resuelto', JSON.stringify({
-          payload: (list ?? []).length,
-          registry: getAllCategories().length,
-          found: created ? { id: String(created.id), kind: created.kind } : null,
-        }));
         onSaved(created ? { id: String(created.id), kind: created.kind, label: created.label } : null);
       }).catch((e) => {
-        // eslint-disable-next-line no-console
-        console.log('[DBG-cat] error', String((e as Error)?.message ?? e));
         fail(e);
       });
     }

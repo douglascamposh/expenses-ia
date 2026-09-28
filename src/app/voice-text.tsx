@@ -1,9 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Check, X } from 'lucide-react-native';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+import { Check, Mic, X } from 'lucide-react-native';
+import Animated, {
+  Easing,
+  FadeInUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui';
 import { Fonts, Spacing } from '@/constants/theme';
@@ -22,9 +30,9 @@ import { setPendingQueue } from '@/store/expensesSlice';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
- * PoC transcripción por micrófono (mockup texto): gradiente cálido,
- * bandera de idioma, texto gigante en vivo, X cancela, ✓ guarda en memoria.
- * El flujo viejo de grabación queda intacto.
+ * Dictado por micrófono: fondo nocturno violeta, micrófono con respiración
+ * suave mientras escucha, bandera de idioma, texto gigante en vivo con
+ * auto-scroll, X cancela, ✓ guarda en memoria.
  */
 export default function VoiceTextScreen() {
   const router = useRouter();
@@ -114,9 +122,16 @@ export default function VoiceTextScreen() {
       : null);
 
   const words = transcript.split(/\s+/).filter(Boolean);
+  const listening = status === 'listening' || status === 'starting';
+  const scrollRef = useRef<ScrollView>(null);
+
+  // Auto-scroll al final mientras se dicta (textos largos).
+  useEffect(() => {
+    if (words.length > 0) scrollRef.current?.scrollToEnd?.({ animated: true });
+  }, [words.length]);
 
   return (
-    <LinearGradient colors={['#E8825C', '#8E5B8E']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.bg}>
+    <LinearGradient colors={['#101A3A', '#4C1D95', '#9333EA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.bg}>
       <SafeAreaView style={styles.safe}>
         <View style={styles.topRow}>
           <View style={styles.spacer} />
@@ -124,7 +139,18 @@ export default function VoiceTextScreen() {
             <Text style={styles.flag}>{flag}</Text>
           </View>
         </View>
-        <ScrollView contentContainerStyle={styles.textWrap} showsVerticalScrollIndicator={false}>
+        <View style={styles.visual} testID="voice-visual">
+          <View style={styles.orbWrap}>
+            {listening && <PulseRing delay={0} />}
+            {listening && <PulseRing delay={700} />}
+            <MicOrb listening={listening} />
+          </View>
+        </View>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.textWrap}
+          showsVerticalScrollIndicator={false}
+        >
           {words.length > 0 ? (
             <View style={styles.wordsRow}>
               {words.map((word, i) => (
@@ -167,6 +193,46 @@ export default function VoiceTextScreen() {
   );
 }
 
+/** Micrófono compacto con respiración suave mientras escucha. */
+function MicOrb({ listening }: { listening: boolean }) {
+  const breath = useSharedValue(1);
+  useEffect(() => {
+    if (!listening) {
+      breath.value = 1;
+      return;
+    }
+    breath.value = withRepeat(
+      withTiming(1.12, { duration: 1100, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
+    );
+  }, [listening, breath]);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: breath.value }],
+  }));
+  return (
+    <Animated.View style={[styles.orb, style]}>
+      <Mic size={26} color="#FFFFFF" />
+    </Animated.View>
+  );
+}
+
+/** Anillo expansivo alrededor del mic (solo montado mientras escucha). */
+function PulseRing({ delay }: { delay: number }) {
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    progress.value = withDelay(
+      delay,
+      withRepeat(withTiming(1, { duration: 2200, easing: Easing.out(Easing.ease) }), -1, false),
+    );
+  }, [delay, progress]);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + progress.value * 1.1 }],
+    opacity: 0.45 * (1 - progress.value),
+  }));
+  return <Animated.View style={[styles.ring, style]} />;
+}
+
 const styles = StyleSheet.create({
   bg: { flex: 1 },
   safe: { flex: 1, padding: Spacing.four },
@@ -178,6 +244,18 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3,
   },
   flag: { fontSize: 22 },
+  visual: { alignItems: 'center', gap: Spacing.two, paddingTop: Spacing.two },
+  orbWrap: { width: 120, height: 120, alignItems: 'center', justifyContent: 'center' },
+  orb: {
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#E9D5FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.7, shadowRadius: 18, elevation: 8,
+  },
+  ring: {
+    position: 'absolute', width: 56, height: 56, borderRadius: 28,
+    borderWidth: 2, borderColor: '#FFFFFF',
+  },
   textWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.six },
   transcript: {
     fontSize: 34, lineHeight: 44, fontWeight: '800', fontFamily: Fonts.sans,

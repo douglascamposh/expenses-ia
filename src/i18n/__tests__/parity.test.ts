@@ -31,6 +31,7 @@ describe('i18n parity es/en', () => {
       'settings_no',
       'categories_colorLabel',
       'categories_a11yColor',
+      'pro_title', // Marca: idéntica en ambos idiomas.
     ]);
     const same = (Object.keys(STRINGS.es) as (keyof typeof STRINGS.es)[]).filter(
       (k) => typeof STRINGS.es[k] === 'string' && STRINGS.es[k] === STRINGS.en[k] && !allowSame.has(k),

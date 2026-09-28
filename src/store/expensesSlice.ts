@@ -328,7 +328,8 @@ export const createExpense = createAsyncThunk(
 
 export const deleteExpense = createAsyncThunk('expenses/delete', async (id: string, { dispatch, rejectWithValue }) => {
   try {
-    await expenseRepository.delete(id);
+    // Borrado lógico: se propaga a la nube como tombstone en el próximo sync.
+    await expenseRepository.softDelete(id);
   } catch (e) {
     return rejectWithValue((e as Error).message ?? 'No se pudo eliminar');
   }

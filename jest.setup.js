@@ -1,5 +1,9 @@
 import '@testing-library/jest-native/extend-expect';
 
+// Keys de prueba para el servicio de billing (RevenueCat sin configurar en CI).
+process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY = 'rc-ios-test';
+process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY = 'rc-android-test';
+
 // Mock expo modules that require native runtime
 jest.mock('expo-audio', () => {
   const mockRecorder = {
@@ -134,8 +138,15 @@ jest.mock('react-native-reanimated', () => {
     FadeIn: chain,
     FadeInUp: chain,
     FadeOut: chain,
+    SlideInUp: chain,
+    SlideInDown: chain,
     Layout: { springify: () => ({}) },
-    Easing: { linear: (t) => t, ease: (t) => t },
+    Easing: { linear: (t) => t, ease: (t) => t, out: (e) => e, in: (e) => e, inOut: (e) => e },
+    withTiming: (v) => v,
+    withSpring: (v) => v,
+    withDelay: (_, v) => v,
+    withRepeat: (v) => v,
+    withSequence: (...vs) => vs[vs.length - 1],
     useSharedValue: (v) => ({ value: v }),
     useAnimatedStyle: (fn) => fn(),
     useDerivedValue: (fn) => ({ value: fn() }),
@@ -186,13 +197,21 @@ jest.mock('expo-localization', () => ({
 }));
 
 
-jest.mock('@react-native-firebase/auth', () => {
-  const api = {
+jest.mock('@react-native-firebase/auth', () => {  const api = {
     getAuth: jest.fn(() => ({ currentUser: { uid: 'test-uid' } })),
     signInAnonymously: jest.fn(() =>
       Promise.resolve({ user: { uid: 'test-anon-uid' } }),
     ),
     getIdToken: jest.fn(() => Promise.resolve('test-id-token')),
+    GoogleAuthProvider: { credential: jest.fn((idToken) => ({ idToken })) },
+    linkWithCredential: jest.fn((user) =>
+      Promise.resolve({ user: { ...user, providerData: [{ providerId: 'google.com' }] } }),
+    ),
+    signInWithCredential: jest.fn(() =>
+      Promise.resolve({ user: { uid: 'google-uid' } }),
+    ),
+    signOut: jest.fn(() => Promise.resolve()),
+    deleteUser: jest.fn(() => Promise.resolve()),
   };
   return { ...api, __api: api };
 });

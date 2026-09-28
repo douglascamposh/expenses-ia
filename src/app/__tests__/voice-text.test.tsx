@@ -13,6 +13,7 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: jest.fn(() => ({})),
   useFocusEffect: jest.fn(() => {}),
 }));
+jest.mock('@/utils/debug-log', () => ({ logApiError: jest.fn(), logApiWarn: jest.fn() }));
 
 function renderScreen() {
   const testStore = configureStore({
@@ -80,6 +81,12 @@ describe('VoiceTextScreen (PoC transcripción)', () => {
     expect(queryByText(/es-MX/)).toBeNull();
   });
 
+  it('muestra la zona visual (orbe + ecualizador) sobre la transcripción', async () => {
+    const { getByTestId, getByText } = renderScreen();
+    await waitFor(() => expect(getByTestId('voice-visual')).toBeTruthy());
+    expect(getByText('Dime los detalles de tu transacción')).toBeTruthy();
+  });
+
   it('muestra el placeholder y luego palabras separadas que se consolidan', async () => {
     const { __listeners } = speechMocks();
     const { getByText, queryByText } = renderScreen();
@@ -103,6 +110,31 @@ describe('VoiceTextScreen (PoC transcripción)', () => {
     expect(ExpoSpeechRecognitionModule.start.mock.calls[1][0]).toMatchObject({
       requiresOnDeviceRecognition: false,
     });
+  });
+
+  it('silencio con texto ya dictado conserva y finaliza sin error', async () => {
+    const { ExpoSpeechRecognitionModule, __listeners } = speechMocks();
+    const { getByText, queryByText } = renderScreen();
+    await waitFor(() => expect(__listeners.start).toBeDefined());
+    act(() => { __listeners.start(undefined as never); });
+    act(() => { __listeners.result({ results: [{ transcript: 'Uber 25' }], isFinal: true } as never); });
+    act(() => { __listeners.error({ error: 'no-speech' } as never); });
+    expect(getByText('Uber')).toBeTruthy();
+    expect(queryByText('No te escuché, intenta de nuevo')).toBeNull();
+    expect(ExpoSpeechRecognitionModule.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('silencio en vacío relanza dos veces y luego muestra error', async () => {
+    const { ExpoSpeechRecognitionModule, __listeners } = speechMocks();
+    const { getByText } = renderScreen();
+    await waitFor(() => expect(ExpoSpeechRecognitionModule.start).toHaveBeenCalledTimes(1));
+    act(() => { __listeners.error({ error: 'speech-timeout' } as never); });
+    await waitFor(() => expect(ExpoSpeechRecognitionModule.start).toHaveBeenCalledTimes(2));
+    act(() => { __listeners.error({ error: 'no-speech' } as never); });
+    await waitFor(() => expect(ExpoSpeechRecognitionModule.start).toHaveBeenCalledTimes(3));
+    act(() => { __listeners.error({ error: 'no-speech' } as never); });
+    await waitFor(() => expect(getByText('No te escuché, intenta de nuevo')).toBeTruthy());
+    expect(ExpoSpeechRecognitionModule.start).toHaveBeenCalledTimes(3);
   });
 
   it('✓ envía el texto al endpoint, guarda draft y vuelve con cola', async () => {
