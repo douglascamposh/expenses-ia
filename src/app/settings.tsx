@@ -80,7 +80,7 @@ export default function SettingsScreen() {
             subtitle={skipIncome ? t('settings_no') : t('settings_yes')}
             onPress={() => void dispatch(setSkipIncome(!skipIncome)).unwrap().catch(() => {})}
           />
-          <SettingRow icon={Cpu} label={t('settings_aiDiagnostics')} />
+          <SettingRow icon={Cpu} label={t('settings_aiDiagnostics')} onPress={() => router.push('/diagnostics' as never)} testID="settings-diagnostics-row" />
         </View>
 
         <Text variant="small" color="textSecondary" style={styles.sectionLabel}>{t('settings_plan')}</Text>

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from '@/components/ui';
 import { getCategoryConfig } from '@/expenses/categories/expenseCategories';
-import { pastel, resolveColor } from '@/expenses/utils/colors';
+import { gradientPair, pastel, resolveColor } from '@/expenses/utils/colors';
 import { useAppSelector } from '@/store/hooks';
 import { Fonts, Spacing } from '@/constants/theme';
 import type { CategorySummary } from '@/store/expensesSlice';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useTheme } from '@/hooks/use-theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 type Props = {
   budgets: { category: string; currency: string; limit: number; spent: number; pct: number }[];
@@ -26,7 +28,8 @@ type Props = {
  * Carrusel en píldora: por defecto todo compacto (emoji + monto + %).
  * Al seleccionar, la píldora crece en horizontal con animación suave
  * mostrando el detalle; con budget asignado muestra el dash.
- * El scroll ya no colapsa nada.
+ * Fondo con degradado del color de la categoría (claro u oscuro según
+ * el tema, como el resto de la app). El scroll ya no colapsa nada.
  */
 const PILL_H = 64;
 /** Ancho base; con onLayout se recalcula para que siempre entren 4 sin corte. */
@@ -54,6 +57,11 @@ export function CategoryCarousel({
 }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
+  // Degradado y texto siguen al tema (claro/oscuro) como el resto de la app.
+  const isDark = (useColorScheme() ?? 'light') === 'dark';
+  const ink = isDark ? '#FFFFFF' : theme.text;
+  const inkSoft = isDark ? 'rgba(255,255,255,0.85)' : theme.textSecondary;
+  const inkFaint = isDark ? 'rgba(255,255,255,0.92)' : theme.income;
   // RN dispara onPress al soltar aunque haya habido long-press: se ignora ese tap.
   const longPressedRef = useRef(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -189,6 +197,8 @@ export function CategoryCarousel({
           const slotWidth = expand.interpolate({ inputRange: [0, 1], outputRange: [slotW, slotW + slotGrow] });
           const detailOpacity = expand;
           const compactOpacity = expand.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+          // Degradado propio de la categoría (la animación de tamaño es la misma de antes).
+          const [gradFrom, gradTo] = gradientPair(cat.color, cat.category, isDark ? 'dark' : 'light');
           // Relleno proporcional de la expandida con budget (lo que falta se ve como pista).
           const fillPct = Math.min(Math.max(cat.pct, 0), 100);
           return (
@@ -196,29 +206,35 @@ export function CategoryCarousel({
               {/* Relleno en Animated.View estático (sin style-función: en nativo
                   el Pressable animado con función se tragaba el backgroundColor).
                   El Pressable interno solo maneja el tap + feedback de opacidad. */}
-              <Animated.View
-                testID={`bar-${cat.category}`}
-                style={[
-                  styles.bar,
-                  {
-                    height: PILL_H,
-                    width: barWidth,
-                    // Compacta: sólida. Expandida con budget: pista clara + relleno
-                    // proporcional. Expandida sin budget: sólida (sin relleno).
-                    backgroundColor: pastel(cat.color, isSelected ? (cat.hasBudget ? 0.22 : 0.55) : 0.45, cat.category),
-                    borderRadius: 32,
-                    borderWidth: isSelected ? 2 : 0,
-                    borderColor: resolveColor(cat.color, cat.category),
-                  },
-                ]}
-              >
+                <Animated.View
+                  testID={`bar-${cat.category}`}
+                  style={[
+                    styles.bar,
+                    {
+                      height: PILL_H,
+                      width: barWidth,
+                      borderRadius: 22,
+                      borderWidth: isSelected ? 2 : 0,
+                      borderColor: isSelected
+                        ? (isDark ? '#FFFFFF' : resolveColor(cat.color, cat.category))
+                        : 'transparent',
+                    },
+                  ]}
+                >
+                  <LinearGradient
+                    testID={`grad-${cat.category}`}
+                    colors={[gradFrom, gradTo]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
                 {/* Relleno = % gastado del budget (la pista muestra lo que falta).
                     Solo con budget: sin budget un % chico se vería como una rayita. */}
                 {cat.hasBudget && (
                   <Animated.View
                     pointerEvents="none"
                     testID={`fill-${cat.category}`}
-                    style={[styles.fill, { width: `${fillPct}%`, backgroundColor: pastel(cat.color, 0.55, cat.category), opacity: expand }]}
+                    style={[styles.fill, { width: `${fillPct}%`, backgroundColor: isDark ? 'rgba(255,255,255,0.35)' : pastel(cat.color, 0.55, cat.category), opacity: expand }]}
                   />
                 )}
                 <Pressable
@@ -253,9 +269,9 @@ export function CategoryCarousel({
                   >
                     <View style={styles.compactRow}>
                       <Text style={styles.compactEmoji}>{cat.emoji}</Text>
-                      <Text style={[styles.compactAmount, { color: theme.text }]}>{Math.round(cat.spent)}</Text>
+                      <Text style={[styles.compactAmount, { color: ink }, isDark && styles.darkInk]}>{Math.round(cat.spent)}</Text>
                     </View>
-                    <Text style={[styles.compactPct, { color: theme.textSecondary }]}>{pctText}</Text>
+                    <Text style={[styles.compactPct, { color: inkSoft }, isDark && styles.darkInk]}>{pctText}</Text>
                   </Animated.View>
                   {/* Expandida: emoji + columna centrada (monto, %, y debajo lo que falta) */}
                   <Animated.View
@@ -265,10 +281,10 @@ export function CategoryCarousel({
                   >
                     <Text style={styles.detailEmoji}>{cat.emoji}</Text>
                     <View style={styles.detailTexts}>
-                      <Text style={[styles.amount, { color: theme.text }]}>{Math.round(cat.spent)}</Text>
-                      <Text style={[styles.pct, { color: theme.textSecondary }]}>{pctText}</Text>
+                      <Text style={[styles.amount, { color: ink }, isDark && styles.darkInk]}>{Math.round(cat.spent)}</Text>
+                      <Text style={[styles.pct, { color: inkSoft }, isDark && styles.darkInk]}>{pctText}</Text>
                       {cat.hasBudget && (
-                        <Text style={[styles.remaining, { color: theme.income }]}>
+                        <Text style={[styles.remaining, { color: inkFaint }, isDark && styles.darkInk]}>
                           {cat.pct > 100
                             ? t('carousel_over', { n: Math.round(cat.pct) - 100 })
                             : t('carousel_remaining', { n: Math.max(0, 100 - Math.round(cat.pct)) })}
@@ -310,20 +326,20 @@ const styles = StyleSheet.create({
   bar: {
     alignItems: 'center',
     justifyContent: 'center',
-    // Recorta el relleno absoluto al borde redondeado (sin esto se sale en nativo).
+    // Recorta el degradado y el relleno al borde redondeado (sin esto se salen en nativo).
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.12,
     shadowRadius: 12,
-    elevation: 2,
+    elevation: 3,
   },
   fill: {
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
-    borderRadius: 32,
+    borderRadius: 22,
   },
   pressFill: {
     flex: 1,
@@ -362,6 +378,8 @@ const styles = StyleSheet.create({
   amount: { fontSize: 16, fontWeight: '700', fontFamily: Fonts.sans, textAlign: 'center' },
   pct: { fontSize: 12, fontWeight: '500', fontFamily: Fonts.sans, textAlign: 'center' },
   remaining: { fontSize: 10, fontWeight: '700', fontFamily: Fonts.sans, textAlign: 'center' },
+  // Sombra sutil para texto blanco sobre el degradado en modo oscuro.
+  darkInk: { textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   barsRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -371,6 +389,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   placeholder: {
-    borderRadius: 32,
+    borderRadius: 22,
   },
 });

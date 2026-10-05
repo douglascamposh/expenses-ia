@@ -1,8 +1,20 @@
 import { ScrollView, StyleSheet } from 'react-native';
+import { getApp } from '@react-native-firebase/app';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { LocalAITestScreen } from '@/screens/LocalAITestScreen';
+import { getApiBaseUrl } from '@/services/expense-api';
+import { getBillingBaseUrl } from '@/services/billing';
+
+/** Proyecto Firebase embebido en este build (dev vs QA se ven iguales si no). */
+function firebaseProjectId(): string {
+  try {
+    return getApp().options.projectId ?? '?';
+  } catch {
+    return 'n/a';
+  }
+}
 
 export default function DiagnosticsScreen() {
   return (
@@ -13,6 +25,14 @@ export default function DiagnosticsScreen() {
           Métricas técnicas del POC (no visibles en Dashboard)
         </ThemedText>
         <LocalAITestScreen />
+        <ThemedView type="backgroundElement" style={styles.card}>
+          <ThemedText type="smallBold">Ambiente</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            • Firebase: {firebaseProjectId()}
+            • API: {getApiBaseUrl()}
+            • Billing/Sync: {getBillingBaseUrl()}
+          </ThemedText>
+        </ThemedView>
         <ThemedView type="backgroundElement" style={styles.card}>
           <ThemedText type="smallBold">Notas</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">

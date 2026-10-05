@@ -64,3 +64,20 @@ export function pastel(raw: unknown, ratio = 0.22, seed = ''): string {
   const mix = (c: number) => Math.round(c * ratio + 255 * (1 - ratio));
   return `rgb(${mix((n >> 16) & 255)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`;
 }
+
+function mixToward(hex: string, target: [number, number, number], ratio: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const mix = (c: number, t: number) => Math.round(c * ratio + t * (1 - ratio));
+  return `rgb(${mix((n >> 16) & 255, target[0])}, ${mix((n >> 8) & 255, target[1])}, ${mix(n & 255, target[2])})`;
+}
+
+/**
+ * Par degradado [claro, base] derivado del color de la categoría.
+ * Claro: tinta suave (texto oscuro legible); oscuro: tile saturado
+ * estilo referencia (texto blanco con sombra sutil).
+ */
+export function gradientPair(raw: unknown, seed = '', mode: 'light' | 'dark' = 'light'): [string, string] {
+  const hex = resolveColor(raw, seed);
+  if (mode === 'dark') return [mixToward(hex, [255, 255, 255], 0.55), mixToward(hex, [0, 0, 0], 0.8)];
+  return [mixToward(hex, [255, 255, 255], 0.25), mixToward(hex, [255, 255, 255], 0.55)];
+}

@@ -8,7 +8,7 @@ import {
   setCustomCategories,
   type CategoryConfig,
 } from '@/expenses/categories/expenseCategories';
-import { barColor, barFill, normKey, pastel } from '@/expenses/utils/colors';
+import { barColor, barFill, gradientPair, normKey, pastel } from '@/expenses/utils/colors';
 
 const COMPRAS: CategoryConfig = {
   id: 'COMPRAS' as CategoryConfig['id'],
@@ -29,6 +29,13 @@ function bgOf(tree: unknown, testID: string): string | undefined {
     (s) => s && typeof s === 'object' && 'backgroundColor' in (s as object),
   ) as { backgroundColor?: string } | undefined;
   return entry?.backgroundColor;
+}
+
+function gradOf(tree: unknown, testID: string): unknown {
+  const node = (tree as { root: { findByProps(p: object): { props: { colors: unknown } } } }).root.findByProps({
+    testID,
+  });
+  return node.props.colors;
 }
 
 afterEach(() => {
@@ -52,8 +59,8 @@ describe('CategoryCarousel color de la categoría', () => {
       </Provider>,
     );
     expect(tree.getAllByText('10%').length).toBeGreaterThanOrEqual(1);
-    // Única barra → queda seleccionada: pista clara + relleno 0.55 del rojo elegido
-    expect(bgOf(tree, 'bar-COMPRAS')).toBe(pastel('#ef4444', 0.22, 'COMPRAS'));
+    // Única barra → queda seleccionada: degradado del rojo elegido + relleno pastel
+    expect(gradOf(tree, 'grad-COMPRAS')).toEqual(gradientPair('#ef4444', 'COMPRAS', 'light'));
     expect(bgOf(tree, 'fill-COMPRAS')).toBe(pastel('#ef4444', 0.55, 'COMPRAS'));
     expect(barColor('COMPRAS')).toBe('#ec4899');
   });
@@ -148,7 +155,7 @@ describe('CategoryCarousel color de la categoría', () => {
     );
     expect(tree.queryByTestId('fill-COMPRAS')).toBeNull();
     expect(tree.queryByTestId('dash-COMPRAS')).toBeNull();
-    expect(bgOf(tree, 'bar-COMPRAS')).toBe(pastel('#ef4444', 0.55, 'COMPRAS'));
+    expect(gradOf(tree, 'grad-COMPRAS')).toEqual(gradientPair('#ef4444', 'COMPRAS', 'light'));
   });
 
   it('long-press avisa la categoría y no alterna el filtro al soltar', () => {
@@ -193,6 +200,17 @@ describe('CategoryCarousel color de la categoría', () => {
   it('normKey quita acentos y mayúsculas', () => {
     expect(normKey('Música')).toBe('MUSICA');
     expect(normKey('compras')).toBe('COMPRAS');
+  });
+
+  it('gradientPair deriva [claro, base] del color según el modo', () => {
+    const light = gradientPair('#ef4444', 'COMPRAS', 'light');
+    const dark = gradientPair('#ef4444', 'COMPRAS', 'dark');
+    expect(light).toHaveLength(2);
+    expect(dark).toHaveLength(2);
+    expect(light).not.toEqual(dark);
+    for (const c of [...light, ...dark]) expect(c).toMatch(/^rgb\(\d+, \d+, \d+\)$/);
+    // Claro por defecto
+    expect(gradientPair('#ef4444', 'COMPRAS')).toEqual(light);
   });
 
   it("getCategoryConfig resuelve 'Compras'/'compras' a la custom COMPRAS", () => {
