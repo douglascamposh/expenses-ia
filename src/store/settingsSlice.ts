@@ -2,11 +2,11 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { DEFAULT_CURRENCY, isValidCurrency, type Currency } from '@/expenses/models/Expense';
 import { SETTING_KEYS, settingsRepository } from '@/expenses/repositories/SettingsRepository';
 
-export type LanguageSetting = 'system' | 'es' | 'en';
+export type LanguageSetting = 'system' | 'es' | 'en' | 'pt';
 export type ThemeModeSetting = 'system' | 'light' | 'dark';
 
 function asLanguage(v: string | null): LanguageSetting {
-  return v === 'es' || v === 'en' || v === 'system' ? v : 'system';
+  return v === 'es' || v === 'en' || v === 'pt' || v === 'system' ? v : 'system';
 }
 
 function asThemeMode(v: string | null): ThemeModeSetting {

@@ -1,4 +1,5 @@
 import type { Currency } from '../models/Expense';
+import type { Lang } from '@/i18n/translations';
 
 /** Nombre y país por moneda (selector con buscador). */
 export const CURRENCY_INFO: Record<Currency, { nameEs: string; nameEn: string; countryEs: string; countryEn: string }> = {
@@ -15,13 +16,14 @@ export const CURRENCY_INFO: Record<Currency, { nameEs: string; nameEn: string; c
   UYU: { nameEs: 'peso uruguayo', nameEn: 'Uruguayan peso', countryEs: 'Uruguay', countryEn: 'Uruguay' },
 };
 
-export function currencyName(cur: Currency, lang: 'es' | 'en' = 'es'): string {
+export function currencyName(cur: Currency, lang: Lang = 'es'): string {
   const info = CURRENCY_INFO[cur];
   if (!info) return cur;
+  // Sin nombres en portugués: el español es legible para hablantes de PT.
   return lang === 'en' ? info.nameEn : info.nameEs;
 }
 
-export function currencyCountry(cur: Currency, lang: 'es' | 'en' = 'es'): string {
+export function currencyCountry(cur: Currency, lang: Lang = 'es'): string {
   const info = CURRENCY_INFO[cur];
   if (!info) return '';
   return lang === 'en' ? info.countryEn : info.countryEs;

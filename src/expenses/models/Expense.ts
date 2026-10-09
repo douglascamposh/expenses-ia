@@ -20,7 +20,7 @@ export function isValidFrequency(f: unknown): f is Frequency {
     f === 'MONTHLY' || f === 'BIMONTHLY' || f === 'QUARTERLY' || f === 'ANNUAL';
 }
 
-export type AppLang = 'es' | 'en';
+export type AppLang = 'es' | 'en' | 'pt';
 
 /** Gasto o ingreso. Los ingresos no suman a presupuestos ni totales de gasto. */
 export type EntryKind = 'EXPENSE' | 'INCOME';
@@ -30,8 +30,8 @@ export function isValidKind(k: unknown): k is EntryKind {
 }
 
 const PAYMENT_LABELS: Record<PaymentMethod, Record<AppLang, string>> = {
-  CASH: { es: 'Efectivo', en: 'Cash' },
-  CARD: { es: 'Tarjeta', en: 'Card' },
+  CASH: { es: 'Efectivo', en: 'Cash', pt: 'Dinheiro' },
+  CARD: { es: 'Tarjeta', en: 'Card', pt: 'Cartão' },
 };
 
 const PAYMENT_EMOJI: Record<PaymentMethod, string> = {

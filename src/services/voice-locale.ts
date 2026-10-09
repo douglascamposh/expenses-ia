@@ -1,4 +1,4 @@
-export type AppLang = 'es' | 'en';
+export type AppLang = 'es' | 'en' | 'pt';
 
 const norm = (tag: unknown): string =>
   String(tag ?? '').trim().replace(/_/g, '-').toLowerCase();
@@ -23,11 +23,12 @@ export function flagForRegion(region: string): string {
   return String.fromCodePoint(...[...r].map((c) => 127397 + c.charCodeAt(0)));
 }
 
-/** Bandera por idioma (es → 🇪🇸, en → 🇺🇸). Fallback cuando no hay región. */
+/** Bandera por idioma (es → 🇪🇸, en → 🇺🇸, pt → 🇧🇷). Fallback cuando no hay región. */
 export function flagForLang(lang: unknown): string {
   const l = String(lang ?? '').trim().toLowerCase().split('-')[0];
   if (l === 'es') return '🇪🇸';
   if (l === 'en') return '🇺🇸';
+  if (l === 'pt') return '🇧🇷';
   return '🌐';
 }
 
@@ -52,7 +53,7 @@ export function resolveSpeechLocale(
   supported: { locales?: string[]; installedLocales?: string[] } | null | undefined,
   appLang: AppLang = 'es',
 ): string {
-  const appDefault = appLang === 'en' ? 'en-US' : 'es-MX';
+  const appDefault = appLang === 'en' ? 'en-US' : appLang === 'pt' ? 'pt-BR' : 'es-MX';
   const want = norm(deviceTag);
   if (!want) return appDefault;
   const rawLocales = (supported?.locales ?? []).filter(Boolean);

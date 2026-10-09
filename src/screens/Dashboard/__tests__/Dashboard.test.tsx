@@ -66,6 +66,16 @@ jest.mock('@/expenses/repositories/BudgetRepository', () => ({
   },
 }));
 
+/** Fecha del mes actual (clampada a hoy: sin futuro, siempre en "este mes"). */
+function monthISODate(day: number): string {
+  const now = new Date();
+  const d = Math.min(day, now.getDate());
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+function monthISODateTime(day: number): string {
+  return `${monthISODate(day)}T12:00:00.000Z`;
+}
+
 function renderWithStore() {
   const testStore = configureStore({
     reducer: { expenses: expensesReducer, settings: settingsReducer, categories: categoriesReducer },
@@ -118,8 +128,8 @@ describe('Dashboard', () => {
     expenseRepository.getAll.mockResolvedValueOnce([
       {
         id: 'e1', amount: 35, currency: 'BOB', category: 'FOOD', description: 'Almuerzo',
-        date: '2026-09-07', paymentMethod: 'CASH',
-        createdAt: '2026-09-07T12:00:00.000Z', updatedAt: '2026-09-07T12:00:00.000Z',
+        date: monthISODate(7), paymentMethod: 'CASH',
+        createdAt: monthISODateTime(7), updatedAt: monthISODateTime(7),
       },
     ]);
     const { getByLabelText, getByTestId, getByText, queryByText } = renderWithStore();
@@ -142,8 +152,8 @@ describe('Dashboard', () => {
     expenseRepository.getAll.mockResolvedValueOnce([
       {
         id: 'e1', amount: 35, currency: 'BOB', category: 'FOOD', description: 'Almuerzo',
-        date: '2026-09-07', paymentMethod: 'CASH',
-        createdAt: '2026-09-07T12:00:00.000Z', updatedAt: '2026-09-07T12:00:00.000Z',
+        date: monthISODate(7), paymentMethod: 'CASH',
+        createdAt: monthISODateTime(7), updatedAt: monthISODateTime(7),
       },
     ]);
     const { getByLabelText, getByTestId, getByText } = renderWithStore();
@@ -161,13 +171,13 @@ describe('Dashboard', () => {
     const rows = [
       {
         id: 'e1', amount: 35, currency: 'BOB', category: 'FOOD', kind: 'EXPENSE', description: 'Almuerzo',
-        date: '2026-09-07', paymentMethod: 'CASH',
-        createdAt: '2026-09-07T12:00:00.000Z', updatedAt: '2026-09-07T12:00:00.000Z',
+        date: monthISODate(7), paymentMethod: 'CASH',
+        createdAt: monthISODateTime(7), updatedAt: monthISODateTime(7),
       },
       {
         id: 'e2', amount: 10, currency: 'BOB', category: 'TRANSPORT', kind: 'EXPENSE', description: 'Bus nocturno',
-        date: '2026-09-07', paymentMethod: 'CASH',
-        createdAt: '2026-09-07T12:00:00.000Z', updatedAt: '2026-09-07T12:00:00.000Z',
+        date: monthISODate(7), paymentMethod: 'CASH',
+        createdAt: monthISODateTime(7), updatedAt: monthISODateTime(7),
       },
     ];
     expenseRepository.getAll.mockResolvedValueOnce(rows);
@@ -193,7 +203,7 @@ describe('Dashboard', () => {
       {
         id: 'e1', amount: 35, currency: 'BOB', category: 'FOOD', description: 'Almuerzo',
         date: iso, paymentMethod: 'CASH',
-        createdAt: '2026-09-07T12:00:00.000Z', updatedAt: '2026-09-07T12:00:00.000Z',
+        createdAt: monthISODateTime(7), updatedAt: monthISODateTime(7),
       },
     ];
     // Una para el fetch al montar, otra para el cálculo del thunk
@@ -214,8 +224,8 @@ describe('Dashboard', () => {
     expenseRepository.getAll.mockResolvedValueOnce(
       Array.from({ length: 6 }, (_, i) => ({
         id: `e${i}`, amount: 10 + i, currency: 'BOB', category: 'FOOD', description: `Almuerzo ${i}`,
-        date: '2026-09-07', paymentMethod: 'CASH',
-        createdAt: '2026-09-07T12:00:00.000Z', updatedAt: '2026-09-07T12:00:00.000Z',
+        date: monthISODate(7), paymentMethod: 'CASH',
+        createdAt: monthISODateTime(7), updatedAt: monthISODateTime(7),
       })),
     );
     const { getByLabelText, getByTestId, getByText } = renderWithStore();

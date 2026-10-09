@@ -49,6 +49,7 @@ export default function RootLayout() {
             <Stack.Screen name="voice-text" />
             <Stack.Screen name="ai" />
             <Stack.Screen name="diagnostics" />
+            <Stack.Screen name="privacy" />
           </Stack>
         </ThemeProvider>
       </SafeAreaProvider>

@@ -202,11 +202,11 @@ const LABELS_ES: Record<ExpenseCategory, string> = {
 };
 
 /** Etiqueta de categoría en el idioma dado (base para textos de embedding). */
-export function getCategoryLabel(id: string, lang: 'es' | 'en' = 'en'): string {
+export function getCategoryLabel(id: string, lang: 'es' | 'en' | 'pt' = 'en'): string {
   const custom = customCategories.find((c) => String(c.id) === String(id));
   if (custom) return custom.label;
   if (String(id) === String(SYSTEM_CATEGORY.id)) return SYSTEM_CATEGORY.label;
-  if (lang === 'es' && (Object.values(ExpenseCategory) as string[]).includes(id)) {
+  if (lang !== 'en' && (Object.values(ExpenseCategory) as string[]).includes(id)) {
     return LABELS_ES[id as ExpenseCategory] ?? id;
   }
   return LEGACY_MAP.get(id as ExpenseCategory)?.label ?? id;

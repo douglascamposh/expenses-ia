@@ -50,10 +50,14 @@ describe('Settings budgets', () => {
   });
 
   it('Apariencia permite elegir Dark mode', async () => {
-    const { getByText } = renderWithStore();
+    const { getByText, getByTestId } = renderWithStore();
     await waitFor(() => expect(getByText('Apariencia')).toBeTruthy());
     fireEvent.press(getByText('Apariencia'));
     await waitFor(() => expect(getByText('Modo oscuro')).toBeTruthy());
+    // Las 3 opciones con icono y estado de selección
+    expect(getByTestId('select-option-system')).toBeTruthy();
+    expect(getByTestId('select-option-light')).toBeTruthy();
+    expect(getByTestId('select-option-dark')).toBeTruthy();
     fireEvent.press(getByText('Modo oscuro'));
     await waitFor(() => expect(getByText('Modo oscuro')).toBeTruthy());
   });
@@ -65,6 +69,20 @@ describe('Settings budgets', () => {
     await waitFor(() => expect(getByText('English')).toBeTruthy());
     fireEvent.press(getByText('English'));
     await waitFor(() => expect(getByText('English')).toBeTruthy());
+  });
+
+  it('Idioma permite elegir Português', async () => {
+    const { getByText, getByTestId, queryByTestId } = renderWithStore();
+    await waitFor(() => expect(getByText('Idioma')).toBeTruthy());
+    // Reintenta el press: en este entorno el primer tap a veces no registra.
+    await waitFor(
+      () => {
+        if (!queryByTestId('select-option-pt')) fireEvent.press(getByText('Idioma'));
+        expect(queryByTestId('select-option-pt')).toBeTruthy();
+      },
+      { timeout: 8000 },
+    );
+    fireEvent.press(getByTestId('select-option-pt'));
   });
 
   it('Moneda abre el buscador y cambia a USD', async () => {

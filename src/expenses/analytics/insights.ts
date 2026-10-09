@@ -9,7 +9,7 @@ import type { RecurringRule } from '../models/Recurring';
  */
 
 export type AdviceKind = 'hormiga' | 'review' | 'top' | 'save';
-export type Lang = 'es' | 'en';
+export type Lang = 'es' | 'en' | 'pt';
 
 export interface HormigaGroup {
   key: string;

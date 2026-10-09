@@ -10,13 +10,14 @@ function keysOf(obj: unknown, prefix = ''): string[] {
   return [prefix];
 }
 
-describe('i18n parity es/en', () => {
-  it('mismas claves en ambos idiomas', () => {
+describe('i18n parity es/en/pt', () => {
+  it('mismas claves en los tres idiomas', () => {
     expect(keysOf(STRINGS.en).sort()).toEqual(keysOf(STRINGS.es).sort());
+    expect(keysOf(STRINGS.pt).sort()).toEqual(keysOf(STRINGS.es).sort());
   });
 
   it('sin strings vacíos', () => {
-    for (const lang of ['es', 'en'] as const) {
+    for (const lang of ['es', 'en', 'pt'] as const) {
       for (const v of Object.values(STRINGS[lang])) {
         if (typeof v === 'string') expect(v.length).toBeGreaterThan(0);
       }
@@ -28,6 +29,7 @@ describe('i18n parity es/en', () => {
     const allowSame = new Set([
       'settings_languageEs',
       'settings_languageEn',
+      'settings_languagePt',
       'settings_no',
       'categories_colorLabel',
       'categories_a11yColor',
@@ -46,5 +48,14 @@ describe('i18n parity es/en', () => {
     expect(STRINGS.es.voice_confidence).toMatch(/Confianza/);
     expect(STRINGS.es.voice_edit).toBe('Editar');
     expect(STRINGS.es.expenseConfirmation_title).toMatch(/Nuevo gasto/);
+  });
+
+  it('portugués traduce las claves visibles principales', () => {
+    expect(STRINGS.pt.common_save).toBe('Salvar');
+    expect(STRINGS.pt.settings_title).toBe('Configurações');
+    expect(STRINGS.pt.settings_languagePt).toBe('Português');
+    expect(STRINGS.pt.dashboard_recentExpenses).toBe('Gastos recentes');
+    expect(STRINGS.pt.pro_cta).toBe('Assinar');
+    expect(STRINGS.pt.datePicker_monthsLong[0]).toBe('Janeiro');
   });
 });

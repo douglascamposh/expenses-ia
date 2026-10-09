@@ -78,7 +78,7 @@ describe('AiScreen', () => {
     // Contador visible desde el inicio (cuota gratis por defecto)
     expect(getByTestId('ai-quota')).toBeTruthy();
     expect(getByTestId('ai-suggest-bar')).toBeTruthy();
-    expect(getByText('Te quedan 30 preguntas a la IA')).toBeTruthy();
+    expect(getByText('Te quedan 3 preguntas a la IA')).toBeTruthy();
     expect(getByTestId('ai-input')).toBeTruthy();
     expect(getByTestId('ai-send')).toBeTruthy();
     expect(getByTestId('ai-mic')).toBeTruthy();
@@ -135,7 +135,7 @@ describe('AiScreen', () => {
       await waitFor(() => expect(getByTestId('ai-input')).toBeTruthy());
       fireEvent.changeText(getByTestId('ai-input'), 'cómo ahorro más');
       fireEvent.press(getByTestId('ai-send'));
-      await waitFor(() => expect(getByText('Se acabó el uso de IA de este mes')).toBeTruthy());
+      await waitFor(() => expect(getByText('Se acabó el uso de IA por hoy')).toBeTruthy());
       expect(getByText('Te quedan 0 preguntas a la IA')).toBeTruthy();
       // Sin fallback local tras 429
       expect(queryByText('No entendí, prueba con una sugerencia')).toBeNull();

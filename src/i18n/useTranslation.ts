@@ -5,16 +5,17 @@ import { STRINGS, type Lang, type StringKey } from './translations';
 
 function deviceLang(): Lang {
   try {
-    const code = getLocales()?.[0]?.languageCode;
+    const code = getLocales()?.[0]?.languageCode?.toLowerCase();
     if (!code) return 'es';
-    return code.toLowerCase().startsWith('es') ? 'es' : 'en';
+    if (code.startsWith('pt')) return 'pt';
+    return code.startsWith('es') ? 'es' : 'en';
   } catch {
     return 'es';
   }
 }
 
 export function resolveLang(setting: string | undefined): Lang {
-  if (setting === 'es' || setting === 'en') return setting;
+  if (setting === 'es' || setting === 'en' || setting === 'pt') return setting;
   return deviceLang();
 }
 

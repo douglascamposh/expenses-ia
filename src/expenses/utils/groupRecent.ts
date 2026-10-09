@@ -1,4 +1,5 @@
 import type { Expense } from '../models/Expense';
+import type { Lang } from '@/i18n/translations';
 import { todayLocalISO } from './format';
 
 export interface RecentSection {
@@ -15,17 +16,17 @@ export const MAX_RECENT_DATES = 5;
 /** Tope de items en recientes. */
 export const MAX_RECENT_ITEMS = 30;
 
-export function dayLabel(date: string, lang: 'es' | 'en' = 'es', todayStr?: string): string {
+export function dayLabel(date: string, lang: Lang = 'es', todayStr?: string): string {
   const today = todayStr ?? todayLocalISO();
-  if (date === today) return lang === 'en' ? 'today' : 'hoy';
+  if (date === today) return lang === 'en' ? 'today' : lang === 'pt' ? 'hoje' : 'hoy';
   const base = new Date(today + 'T12:00:00');
   const yesterday = new Date(base);
   yesterday.setDate(base.getDate() - 1);
-  if (date === todayLocalISO(yesterday)) return lang === 'en' ? 'yesterday' : 'ayer';
+  if (date === todayLocalISO(yesterday)) return lang === 'en' ? 'yesterday' : lang === 'pt' ? 'ontem' : 'ayer';
   const before = new Date(base);
   before.setDate(base.getDate() - 2);
-  if (date === todayLocalISO(before)) return lang === 'en' ? 'day before' : 'anteayer';
-  return new Date(date + 'T12:00:00').toLocaleDateString(lang === 'en' ? 'en-US' : 'es-BO', { day: 'numeric', month: 'short' });
+  if (date === todayLocalISO(before)) return lang === 'en' ? 'day before' : lang === 'pt' ? 'anteontem' : 'anteayer';
+  return new Date(date + 'T12:00:00').toLocaleDateString(lang === 'en' ? 'en-US' : lang === 'pt' ? 'pt-BR' : 'es-BO', { day: 'numeric', month: 'short' });
 }
 
 /**
@@ -37,7 +38,7 @@ export function groupRecent(
   maxDates: number = MAX_RECENT_DATES,
   maxItems: number = MAX_RECENT_ITEMS,
   todayStr?: string,
-  lang: 'es' | 'en' = 'es',
+  lang: Lang = 'es',
 ): RecentSection[] {
   const sections: RecentSection[] = [];
   let count = 0;

@@ -18,10 +18,13 @@ export const AI_TIMEOUT_MS = 30000;
 export const AI_MAX_EXPENSES = 200;
 /**
  * Cuota mostrada antes de que el backend responda (modo gratis).
- * El backend es la fuente real: gratis devuelve pocas, pago devuelve
- * más amplias; el texto del contador es el mismo en ambos modos.
+ * El backend es la fuente real y hace cumplir los límites diarios:
+ * gratis = 3 registros/día + 3 preguntas/día, Pro = 100 consultas/día.
+ * El texto del contador es el mismo en ambos modos.
  */
-export const AI_FREE_QUOTA = 30;
+export const AI_FREE_QUOTA = 3;
+/** Cuota diaria Pro (referencial: la hace cumplir el backend). */
+export const AI_PRO_QUOTA = 100;
 
 export type AiResponseType = 'savings_advice' | 'hormiga' | 'month_review' | 'top_spending' | 'lookup';
 export type AiSuggestionKind = 'cut' | 'reduce' | 'subscription' | 'hormiga';

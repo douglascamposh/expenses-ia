@@ -56,8 +56,8 @@ beforeEach(async () => {
   setCustomCategories([]);
   await memExp.create({
     id: 'e1', amount: 35, currency: 'BOB', category: 'FOOD', description: 'Almuerzo',
-    date: '2026-09-07', paymentMethod: 'CASH',
-    createdAt: '2026-09-07T12:00:00.000Z', updatedAt: '2026-09-07T12:00:00.000Z',
+    date: monthISODate(7), paymentMethod: 'CASH',
+    createdAt: monthISODateTime(7), updatedAt: monthISODateTime(7),
   } as never);
 });
 
@@ -69,6 +69,16 @@ afterAll(() => {
   Object.assign(expSingleton, expOrig);
   Object.assign(budSingleton, budOrig);
 });
+
+/** Fecha del mes actual (clampada a hoy: sin futuro, siempre en "este mes"). */
+function monthISODate(day: number): string {
+  const now = new Date();
+  const d = Math.min(day, now.getDate());
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+function monthISODateTime(day: number): string {
+  return `${monthISODate(day)}T12:00:00.000Z`;
+}
 
 function renderWithStore() {
   const testStore = configureStore({

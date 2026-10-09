@@ -1,4 +1,5 @@
 import type { Currency } from '../models/Expense';
+import type { Lang } from '@/i18n/translations';
 
 const currencySymbols: Record<Currency, string> = {
   BOB: 'Bs',
@@ -24,7 +25,9 @@ export function formatCurrency(amount: number, currency: Currency): string {
   return `${symbol} ${formatted}`;
 }
 
-export function formatDateLabel(date: string, lang: 'es' | 'en' = 'es'): string {
+const LOCALES: Record<Lang, string> = { es: 'es-BO', en: 'en-US', pt: 'pt-BR' };
+
+export function formatDateLabel(date: string, lang: Lang = 'es'): string {
   // date: YYYY-MM-DD
   const d = new Date(date + 'T12:00:00');
   const today = new Date();
@@ -32,13 +35,13 @@ export function formatDateLabel(date: string, lang: 'es' | 'en' = 'es'): string 
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
   const yStr = todayLocalISO(yesterday);
-  if (date === todayStr) return lang === 'en' ? 'Today' : 'Hoy';
-  if (date === yStr) return lang === 'en' ? 'Yesterday' : 'Ayer';
-  return d.toLocaleDateString(lang === 'en' ? 'en-US' : 'es-BO', { day: 'numeric', month: 'short' });
+  if (date === todayStr) return lang === 'en' ? 'Today' : lang === 'pt' ? 'Hoje' : 'Hoy';
+  if (date === yStr) return lang === 'en' ? 'Yesterday' : lang === 'pt' ? 'Ontem' : 'Ayer';
+  return d.toLocaleDateString(LOCALES[lang], { day: 'numeric', month: 'short' });
 }
 
-export function formatMonthLabel(date: Date = new Date(), lang: 'es' | 'en' = 'es'): string {
-  return date.toLocaleDateString(lang === 'en' ? 'en-US' : 'es-BO', { month: 'long', year: 'numeric' });
+export function formatMonthLabel(date: Date = new Date(), lang: Lang = 'es'): string {
+  return date.toLocaleDateString(LOCALES[lang], { month: 'long', year: 'numeric' });
 }
 
 export function getGreeting(): string {

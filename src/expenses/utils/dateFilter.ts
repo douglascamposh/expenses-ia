@@ -1,3 +1,5 @@
+import type { Lang } from '@/i18n/translations';
+
 export type DateFilter = 'all' | 'today' | 'week' | 'month';
 
 export const DATE_FILTERS: { id: DateFilter; label: string }[] = [
@@ -8,13 +10,21 @@ export const DATE_FILTERS: { id: DateFilter; label: string }[] = [
 ];
 
 /** Filtros con etiqueta localizada (por defecto español). */
-export function getDateFilters(lang: 'es' | 'en' = 'es'): { id: DateFilter; label: string }[] {
+export function getDateFilters(lang: Lang = 'es'): { id: DateFilter; label: string }[] {
   if (lang === 'en') {
     return [
       { id: 'all', label: 'All' },
       { id: 'today', label: 'Today' },
       { id: 'week', label: 'This week' },
       { id: 'month', label: 'This month' },
+    ];
+  }
+  if (lang === 'pt') {
+    return [
+      { id: 'all', label: 'Tudo' },
+      { id: 'today', label: 'Hoje' },
+      { id: 'week', label: 'Esta semana' },
+      { id: 'month', label: 'Este mês' },
     ];
   }
   return DATE_FILTERS;

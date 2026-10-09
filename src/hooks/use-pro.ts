@@ -10,6 +10,7 @@ import {
   restorePro,
   type ProDetails,
 } from '@/services/billing';
+import type { Lang } from '@/i18n/translations';
 import { currentUid, getAuthToken } from '@/services/auth';
 import { useTranslation } from '@/i18n/useTranslation';
 
@@ -135,11 +136,11 @@ export function usePro(): ProState {
 }
 
 /** Fecha media localizada para el aviso de renovación (cae al ISO si falla). */
-export function formatProDate(iso: string, lang: 'es' | 'en'): string {
+export function formatProDate(iso: string, lang: Lang): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   try {
-    return new Intl.DateTimeFormat(lang === 'es' ? 'es-BO' : 'en-US', { dateStyle: 'medium' }).format(d);
+    return new Intl.DateTimeFormat(lang === 'en' ? 'en-US' : lang === 'pt' ? 'pt-BR' : 'es-BO', { dateStyle: 'medium' }).format(d);
   } catch {
     return iso;
   }

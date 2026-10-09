@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Check, ChevronLeft, ChevronRight, CircleDollarSign, Crown, FileText, Globe, Info, Layers, Moon, PiggyBank, Repeat, Shield, Cpu, TrendingUp, UserRound } from 'lucide-react-native';
+import { Check, ChevronLeft, ChevronRight, CircleDollarSign, Crown, FileText, Globe, Info, Layers, MonitorSmartphone, Moon, PiggyBank, Repeat, Shield, Cpu, Sun, TrendingUp, UserRound } from 'lucide-react-native';
 import { ThemedView } from '@/components/themed-view';
 import { CurrencyModal } from '@/components/CurrencyModal';
 import { Modal } from '@/components/ui/Modal';
@@ -42,7 +42,7 @@ export default function SettingsScreen() {
   }, []));
 
   const languageLabel =
-    language === 'es' ? t('settings_languageEs') : language === 'en' ? t('settings_languageEn') : t('settings_languageSystem');
+    language === 'es' ? t('settings_languageEs') : language === 'en' ? t('settings_languageEn') : language === 'pt' ? t('settings_languagePt') : t('settings_languageSystem');
   const currencySubtitle = `${currencyName(defaultCurrency, lang)} · ${defaultCurrency}`;
   const themeLabel =
     themeMode === 'light' ? t('settings_appearanceLight') : themeMode === 'dark' ? t('settings_appearanceDark') : t('settings_appearanceSystem');
@@ -91,7 +91,7 @@ export default function SettingsScreen() {
         <Text variant="small" color="textSecondary" style={styles.sectionLabel}>{t('settings_about')}</Text>
         <View style={styles.list}>
           <SettingRow icon={Info} label={t('settings_appVersion')} subtitle="1.0.0" chevron={false} />
-          <SettingRow icon={Shield} label={t('settings_privacy')} />
+          <SettingRow icon={Shield} label={t('settings_privacy')} onPress={() => router.push('/privacy' as never)} testID="settings-privacy-row" />
           <SettingRow icon={FileText} label={t('settings_terms')} onPress={() => router.push('/terms' as never)} testID="settings-terms-row" />
         </View>
       </ScrollView>
@@ -103,6 +103,7 @@ export default function SettingsScreen() {
           { id: 'system', label: t('settings_languageSystem') },
           { id: 'es', label: t('settings_languageEs') },
           { id: 'en', label: t('settings_languageEn') },
+          { id: 'pt', label: t('settings_languagePt') },
         ]}
         selected={language}
         onClose={() => setSelectVisible(null)}
@@ -115,9 +116,9 @@ export default function SettingsScreen() {
         visible={selectVisible === 'theme'}
         title={t('settings_selectAppearance')}
         options={[
-          { id: 'system', label: t('settings_appearanceSystem') },
-          { id: 'light', label: t('settings_appearanceLight') },
-          { id: 'dark', label: t('settings_appearanceDark') },
+          { id: 'system', label: t('settings_appearanceSystem'), icon: MonitorSmartphone },
+          { id: 'light', label: t('settings_appearanceLight'), icon: Sun },
+          { id: 'dark', label: t('settings_appearanceDark'), icon: Moon },
         ]}
         selected={themeMode}
         onClose={() => setSelectVisible(null)}
@@ -156,20 +157,28 @@ function SettingRow({ icon: Icon, label, subtitle, chevron = true, onPress, test
   );
 }
 
+type SelectOption = {
+  id: string;
+  label: string;
+  icon?: React.ComponentType<{ size?: number; color?: string }>;
+};
+
 function SelectModal({ visible, title, options, selected, onClose, onSelect }: {
   visible: boolean;
   title: string;
-  options: { id: string; label: string }[];
+  options: SelectOption[];
   selected: string;
   onClose: () => void;
   onSelect: (id: string) => void;
 }) {
+  const theme = useTheme();
   return (
     <Modal visible={visible} variant="center" animation="fade" overlayOpacity={0.45} onDismiss={onClose}>
       <View style={styles.selectBox}>
         <Text variant="smallBold" align="center">{title}</Text>
         {options.map((o) => {
           const active = o.id === selected;
+          const Icon = o.icon;
           return (
             <Pressable
               key={o.id}
@@ -177,8 +186,20 @@ function SelectModal({ visible, title, options, selected, onClose, onSelect }: {
               accessibilityLabel={o.label}
               accessibilityState={{ selected: active }}
               onPress={() => onSelect(o.id)}
-              style={[styles.selectRow, active && { backgroundColor: 'rgba(124,58,237,0.10)' }]}
+              testID={`select-option-${o.id}`}
+              style={[
+                styles.selectRow,
+                {
+                  backgroundColor: active ? 'rgba(124,58,237,0.10)' : theme.backgroundElement,
+                  borderColor: active ? '#7C3AED' : theme.border,
+                },
+              ]}
             >
+              {Icon && (
+                <View style={[styles.selectIconBox, active && styles.selectIconBoxActive]}>
+                  <Icon size={22} color={active ? '#7C3AED' : theme.textSecondary} />
+                </View>
+              )}
               <Text variant="smallBold" style={styles.selectLabel}>{o.label}</Text>
               {active && <Check size={18} color="#7C3AED" />}
             </Pressable>
@@ -202,7 +223,9 @@ const styles = StyleSheet.create({
   labelCol: { flex: 1, gap: 2 },
   rowLabel: { fontFamily: Fonts.sans },
   selectBox: { width: '100%', gap: Spacing.two },
-  selectRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12 },
+  selectRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1.5 },
+  selectIconBox: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(124,58,237,0.12)' },
+  selectIconBoxActive: { backgroundColor: 'rgba(124,58,237,0.18)' },
   selectLabel: { flex: 1 },
   chevron: { fontSize: 18, fontFamily: Fonts.sans },
 });

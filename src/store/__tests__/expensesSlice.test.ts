@@ -256,7 +256,9 @@ describe('expenses slice único (SQLite fuente de verdad)', () => {
 
 function monthISO(day: number): string {
   const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  // Clamp al día actual: días futuros del mes quedan fuera de "este mes".
+  const d = Math.min(day, now.getDate());
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 describe('answerAnalytics (preguntas analíticas exactas)', () => {

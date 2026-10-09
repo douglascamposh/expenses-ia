@@ -82,6 +82,8 @@
     "apk:qa": "./scripts/build-apk.sh qa",
     "apk:release": "./scripts/build-apk.sh dev release",
     "apk:qa:release": "./scripts/build-apk.sh qa release",
+    "aab": "./scripts/build-aab.sh dev",
+    "aab:qa": "./scripts/build-aab.sh qa",
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "jest",
