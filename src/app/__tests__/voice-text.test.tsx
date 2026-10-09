@@ -112,7 +112,7 @@ describe('VoiceTextScreen (PoC transcripción)', () => {
     });
   });
 
-  it('silencio con texto ya dictado conserva y finaliza sin error', async () => {
+  it('silencio con texto ya dictado conserva y sigue escuchando', async () => {
     const { ExpoSpeechRecognitionModule, __listeners } = speechMocks();
     const { getByText, queryByText } = renderScreen();
     await waitFor(() => expect(__listeners.start).toBeDefined());
@@ -121,7 +121,44 @@ describe('VoiceTextScreen (PoC transcripción)', () => {
     act(() => { __listeners.error({ error: 'no-speech' } as never); });
     expect(getByText('Uber')).toBeTruthy();
     expect(queryByText('No te escuché, intenta de nuevo')).toBeNull();
-    expect(ExpoSpeechRecognitionModule.start).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(ExpoSpeechRecognitionModule.start).toHaveBeenCalledTimes(2));
+  });
+
+  it('pausa Android: interim + timeout + segunda parte acumula todo', async () => {
+    const { ExpoSpeechRecognitionModule, __listeners } = speechMocks();
+    const { getByText } = renderScreen();
+    await waitFor(() => expect(__listeners.start).toBeDefined());
+    act(() => { __listeners.start(undefined as never); });
+    act(() => { __listeners.result({ results: [{ transcript: 'hoy gasté' }], isFinal: false } as never); });
+    act(() => { __listeners.error({ error: 'speech-timeout' } as never); });
+    await waitFor(() => expect(ExpoSpeechRecognitionModule.start).toHaveBeenCalledTimes(2));
+    act(() => { __listeners.result({ results: [{ transcript: '20 bolivianos' }], isFinal: true } as never); });
+    for (const w of ['hoy', 'gasté', '20', 'bolivianos']) expect(getByText(w)).toBeTruthy();
+  });
+
+  it('end espontáneo tras pausa conserva interim y relanza', async () => {
+    const { ExpoSpeechRecognitionModule, __listeners } = speechMocks();
+    const { getByText } = renderScreen();
+    await waitFor(() => expect(__listeners.start).toBeDefined());
+    act(() => { __listeners.start(undefined as never); });
+    act(() => { __listeners.result({ results: [{ transcript: 'hoy gasté' }], isFinal: false } as never); });
+    act(() => { __listeners.end(undefined as never); });
+    await waitFor(() => expect(ExpoSpeechRecognitionModule.start).toHaveBeenCalledTimes(2));
+    act(() => { __listeners.result({ results: [{ transcript: '20 bolivianos' }], isFinal: true } as never); });
+    for (const w of ['hoy', 'gasté', '20', 'bolivianos']) expect(getByText(w)).toBeTruthy();
+  });
+
+  it('final duplicado de Android no duplica el texto', async () => {
+    const { __listeners } = speechMocks();
+    const { getByText } = renderScreen();
+    await waitFor(() => expect(__listeners.start).toBeDefined());
+    act(() => { __listeners.start(undefined as never); });
+    act(() => { __listeners.result({ results: [{ transcript: 'hoy gasté' }], isFinal: true } as never); });
+    act(() => { __listeners.result({ results: [{ transcript: 'hoy gasté' }], isFinal: true } as never); });
+    // Dos palabras únicas visibles (render usa key por índice, así que
+    // verificamos que el transcript guardado no duplique vía confirm).
+    expect(getByText('hoy')).toBeTruthy();
+    expect(getByText('gasté')).toBeTruthy();
   });
 
   it('silencio en vacío relanza dos veces y luego muestra error', async () => {

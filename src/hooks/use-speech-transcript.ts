@@ -15,15 +15,13 @@ export type TranscriptError = 'permission' | 'unavailable' | 'no-speech' | 'unkn
 const MAX_SILENCE_RESTARTS = 2;
 
 /**
- * Transcripción por micrófono (PoC): primero intenta 100% on-device
- * (offline) y si el modelo no está disponible reintenta vía servidor.
- * Acumula parciales + finales (Android segmenta, iOS da un final).
- */
-/**
- * Transcripción por micrófono (PoC): usa el idioma del celular sin forzar
+ * Transcripción por micrófono: usa el idioma del celular sin forzar
  * descargas (instalado → soportado → regional). Offline solo si el modelo
  * ya está en el dispositivo; si no, vía servidor. Ante
  * language-not-supported, un reintento al es-MX/es-ES de respaldo.
+ * Escucha continua hasta cierre manual (✓/X): Android corta por pausas,
+ * así que ante silencio/timeout/end se conserva lo dictado y se relanza.
+ * Acumula parciales + finales (Android segmenta, iOS da un final).
  */
 export function useSpeechTranscript(appLang: AppLang) {
   const [status, setStatus] = useState<SpeechStatus>('idle');
@@ -35,8 +33,14 @@ export function useSpeechTranscript(appLang: AppLang) {
   const retriedServer = useRef(false);
   const retriedLocale = useRef(false);
   const heardRef = useRef(false);
+  const interimRef = useRef('');
+  const manualStopRef = useRef(false);
   const silenceRestarts = useRef(0);
   const lastLaunchRef = useRef<{ code: string; onDevice: boolean } | null>(null);
+  const statusRef = useRef(status);
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
   const appLangRef = useRef(appLang);
   useEffect(() => {
     appLangRef.current = appLang;
@@ -59,9 +63,11 @@ export function useSpeechTranscript(appLang: AppLang) {
     setError(null);
     setParts([]);
     setInterim('');
+    interimRef.current = '';
     retriedServer.current = false;
     retriedLocale.current = false;
     heardRef.current = false;
+    manualStopRef.current = false;
     silenceRestarts.current = 0;
     setStatus('starting');
     try {
@@ -99,19 +105,40 @@ export function useSpeechTranscript(appLang: AppLang) {
   }, [launch]);
 
   const stop = useCallback(() => {
+    manualStopRef.current = true;
     try {
       ExpoSpeechRecognitionModule.stop();
     } catch {
       // Sin módulo nativo (Expo Go): nada que detener.
     }
+    setStatus('done');
   }, []);
 
   const abort = useCallback(() => {
+    manualStopRef.current = true;
     try {
       ExpoSpeechRecognitionModule.abort();
     } catch {
       // Sin módulo nativo (Expo Go): nada que cancelar.
     }
+    setStatus('done');
+  }, []);
+
+  /** Mueve el interim actual a parts (evita perder lo dictado antes de una pausa). */
+  const commitInterim = useCallback(() => {
+    const text = interimRef.current.trim();
+    if (!text) return;
+    interimRef.current = '';
+    setInterim('');
+    setParts((prev) => {
+      const last = prev[prev.length - 1];
+      if (last === text) return prev;
+      // Android puede reenviar acumulado ("hoy gasté" y luego "hoy gasté 20");
+      // conserva la versión más larga en vez de duplicar.
+      if (last && text.includes(last)) return [...prev.slice(0, -1), text];
+      if (last && last.includes(text)) return prev;
+      return [...prev, text];
+    });
   }, []);
 
   useSpeechRecognitionEvent('start', () => setStatus('listening'));
@@ -121,27 +148,43 @@ export function useSpeechTranscript(appLang: AppLang) {
     if (!text) return;
     heardRef.current = true;
     if (event.isFinal) {
-      setParts((prev) => [...prev, text]);
+      interimRef.current = '';
       setInterim('');
+      setParts((prev) => {
+        const last = prev[prev.length - 1];
+        if (last === text) return prev;
+        if (last && text.includes(last)) return [...prev.slice(0, -1), text];
+        if (last && last.includes(text)) return prev;
+        return [...prev, text];
+      });
     } else {
+      interimRef.current = text;
       setInterim(text);
     }
   });
 
   /**
-   * Silencio/timeout: si ya se escuchó algo se conserva y finaliza
-   * (el usuario confirma lo dictado); si no, se relanza la escucha
-   * hasta MAX_SILENCE_RESTARTS antes de mostrar error.
+   * Escucha continua hasta cierre manual (✓/X): ante silencio/timeout se
+   * conserva lo dictado (incluido el interim) y se relanza la escucha.
+   * Solo el silencio inicial en vacío muestra error tras MAX_SILENCE_RESTARTS.
    */
+  const relaunch = useCallback(() => {
+    const last = lastLaunchRef.current;
+    if (!last) return false;
+    try {
+      launch(last.code, last.onDevice);
+      setStatus('listening');
+      return true;
+    } catch {
+      return false;
+    }
+  }, [launch]);
+
   const handleSilence = useCallback(() => {
+    commitInterim();
     if (heardRef.current) {
-      try {
-        ExpoSpeechRecognitionModule.stop();
-      } catch {
-        // Sin módulo nativo: nada que detener.
-      }
-      setStatus('done');
-      return;
+      logApiWarn('speech', 'pausa: continúa escuchando', undefined);
+      if (relaunch()) return;
     }
     if (silenceRestarts.current < MAX_SILENCE_RESTARTS) {
       silenceRestarts.current += 1;
@@ -158,9 +201,10 @@ export function useSpeechTranscript(appLang: AppLang) {
     }
     setError('no-speech');
     setStatus('error');
-  }, [launch]);
+  }, [commitInterim, relaunch, launch]);
 
   useSpeechRecognitionEvent('error', (event) => {
+    if (manualStopRef.current) return;
     const code = String((event as { error?: unknown })?.error ?? 'unknown');
     logApiError('speech', new Error(`reconocimiento: ${code}`), { code });
     // Silencio/timeout con política propia (no gasta el reintento de servidor).
@@ -201,7 +245,16 @@ export function useSpeechTranscript(appLang: AppLang) {
   });
 
   useSpeechRecognitionEvent('end', () => {
-    setStatus((prev) => (prev === 'listening' ? 'done' : prev));
+    // Cierre manual (✓/X o desmontaje): finalizar. Corte espontáneo de
+    // Android tras una pausa: conservar interim y seguir escuchando.
+    if (manualStopRef.current) {
+      setStatus('done');
+      return;
+    }
+    if (statusRef.current !== 'listening' && statusRef.current !== 'starting') return;
+    commitInterim();
+    logApiWarn('speech', 'sesión cortada: continúa escuchando', undefined);
+    relaunch();
   });
 
   // Al desmontar: cancelar sesión nativa.
