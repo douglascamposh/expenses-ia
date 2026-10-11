@@ -196,6 +196,12 @@ jest.mock('expo-localization', () => ({
   getLocales: jest.fn(() => [{ languageCode: 'es', languageTag: 'es-BO' }]),
 }));
 
+jest.mock('expo-keep-awake', () => ({
+  useKeepAwake: jest.fn(),
+  activateKeepAwakeAsync: jest.fn(() => Promise.resolve()),
+  deactivateKeepAwake: jest.fn(),
+}));
+
 
 jest.mock('@react-native-firebase/auth', () => {  const api = {
     getAuth: jest.fn(() => ({ currentUser: { uid: 'test-uid' } })),

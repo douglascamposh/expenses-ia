@@ -87,6 +87,16 @@ describe('VoiceTextScreen (PoC transcripción)', () => {
     expect(getByText('Dime los detalles de tu transacción')).toBeTruthy();
   });
 
+  it('mantiene la pantalla encendida solo mientras escucha', async () => {
+    const { __listeners } = speechMocks();
+    const { getByTestId, getByLabelText, queryByTestId } = renderScreen();
+    await waitFor(() => expect(__listeners.start).toBeDefined());
+    // Auto-inicio al montar (starting): keep-awake activo desde el inicio.
+    await waitFor(() => expect(getByTestId('keep-awake-active')).toBeTruthy());
+    fireEvent.press(getByLabelText('Cancelar transcripción'));
+    await waitFor(() => expect(queryByTestId('keep-awake-active')).toBeNull());
+  });
+
   it('muestra el placeholder y luego palabras separadas que se consolidan', async () => {
     const { __listeners } = speechMocks();
     const { getByText, queryByText } = renderScreen();

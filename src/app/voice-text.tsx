@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useKeepAwake } from 'expo-keep-awake';
 import { Check, Mic, X } from 'lucide-react-native';
 import Animated, {
   Easing,
@@ -132,6 +133,7 @@ export default function VoiceTextScreen() {
 
   return (
     <LinearGradient colors={['#101A3A', '#4C1D95', '#9333EA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.bg}>
+      {listening && <KeepAwakeWhileListening />}
       <SafeAreaView style={styles.safe}>
         <View style={styles.topRow}>
           <View style={styles.spacer} />
@@ -193,6 +195,16 @@ export default function VoiceTextScreen() {
   );
 }
 
+/**
+ * Mantiene la pantalla encendida solo mientras se dicta (Android apaga
+ * la pantalla por timeout aunque el reconocimiento siga activo).
+ * Al desmontarse (stop/confirmar/salir) se libera automáticamente.
+ */
+function KeepAwakeWhileListening() {
+  useKeepAwake('voice-dictation');
+  return <View testID="keep-awake-active" style={styles.keepAwake} />;
+}
+
 /** Micrófono compacto con respiración suave mientras escucha. */
 function MicOrb({ listening }: { listening: boolean }) {
   const breath = useSharedValue(1);
@@ -235,6 +247,7 @@ function PulseRing({ delay }: { delay: number }) {
 
 const styles = StyleSheet.create({
   bg: { flex: 1 },
+  keepAwake: { width: 0, height: 0 },
   safe: { flex: 1, padding: Spacing.four },
   topRow: { flexDirection: 'row', alignItems: 'center' },
   spacer: { flex: 1 },
