@@ -14,6 +14,9 @@ export const SEMANTIC_MAX_RESULTS = 50;
 
 export type VisibleMonth = { year: number; month: number };
 
+/** Tamaño de página del scroll infinito (por kind: gastos e ingresos). */
+export const PAGE_SIZE = 30;
+
 export interface ExpensesState {
   items: Expense[];
   recent: Expense[];
@@ -38,6 +41,17 @@ export interface ExpensesState {
   budgetError: string | null;
   /** Respuesta exacta a pregunta analítica ("cuánto gasté", "gasto más fuerte"). */
   analytics: AnalyticsAnswer | null;
+  /** Scroll infinito: próxima página a pedir por kind (0 = inicial cargada). */
+  pageExp: number;
+  pageInc: number;
+  /** Scroll infinito: quedan más páginas por kind. */
+  hasMoreExp: boolean;
+  hasMoreInc: boolean;
+  /** Totales del mes por kind ("Mostrando X de Y"). */
+  monthCountExp: number;
+  monthCountInc: number;
+  /** Carga de página en curso (bloquea doble fetch). */
+  loadingMore: boolean;
 }
 
 export interface AnalyticsAnswer {
@@ -74,6 +88,13 @@ const initialState: ExpensesState = {
   budgets: [],
   budgetError: null,
   analytics: null,
+  pageExp: 1,
+  pageInc: 1,
+  hasMoreExp: false,
+  hasMoreInc: false,
+  monthCountExp: 0,
+  monthCountInc: 0,
+  loadingMore: false,
 };
 
 function toSafeArray<T>(v: T[] | null | undefined): T[] {
@@ -111,10 +132,13 @@ export const fetchExpenses = createAsyncThunk(
     const yearFrom = `${visibleMonth.year}-01-01`;
     const yearTo = `${visibleMonth.year}-12-31`;
     // Recientes: mes visible con ambos kinds (el filtro gastos/ingresos lo aplica la UI).
-    const [all, recExp, recInc, summ, incomeSumm, budgets, monthlyTotals, oldestDate] = await Promise.all([
+    // Página 0 (PAGE_SIZE por kind) + conteos para "Mostrando X de Y".
+    const [all, recExp, recInc, countExp, countInc, summ, incomeSumm, budgets, monthlyTotals, oldestDate] = await Promise.all([
       expenseRepository.getAll(),
-      expenseRepository.getByMonthRange(from, to, 'EXPENSE', 30).catch(() => [] as Expense[]),
-      expenseRepository.getByMonthRange(from, to, 'INCOME', 30).catch(() => [] as Expense[]),
+      expenseRepository.getByMonthRange(from, to, 'EXPENSE', PAGE_SIZE, 0).catch(() => [] as Expense[]),
+      expenseRepository.getByMonthRange(from, to, 'INCOME', PAGE_SIZE, 0).catch(() => [] as Expense[]),
+      expenseRepository.countByMonthRange(from, to, 'EXPENSE').catch(() => 0),
+      expenseRepository.countByMonthRange(from, to, 'INCOME').catch(() => 0),
       expenseRepository.getCategorySummary(from, 'EXPENSE', to),
       expenseRepository.getCategorySummary(from, 'INCOME', to).catch(() => [] as CategorySummary[]),
       budgetRepository.getProgress(from, to).catch(() => [] as BudgetProgress[]),
@@ -122,9 +146,10 @@ export const fetchExpenses = createAsyncThunk(
       expenseRepository.getOldestDate().catch(() => null as string | null),
     ]);
     const safeAll = toSafeArray<Expense>(all);
-    const safeRec = [...toSafeArray<Expense>(recExp), ...toSafeArray<Expense>(recInc)]
-      .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
-      .slice(0, 30);
+    const safeExp = toSafeArray<Expense>(recExp);
+    const safeInc = toSafeArray<Expense>(recInc);
+    const safeRec = [...safeExp, ...safeInc]
+      .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
     const safeSumm = toSafeArray<CategorySummary>(summ);
     const safeIncomeSumm = toSafeArray<CategorySummary>(incomeSumm);
     return {
@@ -137,7 +162,49 @@ export const fetchExpenses = createAsyncThunk(
       visibleMonth,
       monthlyTotals: toSafeArray(monthlyTotals),
       oldestDate,
+      pageExp: 1,
+      pageInc: 1,
+      hasMoreExp: safeExp.length >= PAGE_SIZE,
+      hasMoreInc: safeInc.length >= PAGE_SIZE,
+      monthCountExp: typeof countExp === 'number' ? countExp : 0,
+      monthCountInc: typeof countInc === 'number' ? countInc : 0,
     };
+  },
+);
+
+/**
+ * Siguiente página del scroll infinito (mes visible, ambos kinds).
+ * No-op (null) si ya carga o no quedan páginas. Resetea con fetchExpenses.
+ */
+export const fetchMoreExpenses = createAsyncThunk(
+  'expenses/fetchMore',
+  async (_: void, { getState }) => {
+    const s = (getState() as { expenses: ExpensesState }).expenses;
+    const { from, to } = formatMonthRange(new Date(s.visibleMonth.year, s.visibleMonth.month - 1, 1));
+    const fetchExp = s.hasMoreExp;
+    const fetchInc = s.hasMoreInc;
+    const [moreExp, moreInc] = await Promise.all([
+      fetchExp
+        ? expenseRepository.getByMonthRange(from, to, 'EXPENSE', PAGE_SIZE, s.pageExp * PAGE_SIZE).catch(() => [] as Expense[])
+        : Promise.resolve([] as Expense[]),
+      fetchInc
+        ? expenseRepository.getByMonthRange(from, to, 'INCOME', PAGE_SIZE, s.pageInc * PAGE_SIZE).catch(() => [] as Expense[])
+        : Promise.resolve([] as Expense[]),
+    ]);
+    return {
+      moreExp: toSafeArray<Expense>(moreExp),
+      moreInc: toSafeArray<Expense>(moreInc),
+      fetchExp,
+      fetchInc,
+    };
+  },
+  {
+    // Corre ANTES del pending: evita que el propio pending envenene el guard
+    // y cancela doble-fetch / páginas agotadas sin despachar nada.
+    condition: (_, { getState }) => {
+      const s = (getState() as { expenses: ExpensesState }).expenses;
+      return !s.loadingMore && (s.hasMoreExp || s.hasMoreInc);
+    },
   },
 );
 
@@ -390,6 +457,7 @@ const expensesSlice = createSlice({
       .addCase(fetchExpenses.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.loadingMore = false;
       })
       .addCase(fetchExpenses.fulfilled, (state, action) => {
         state.loading = false;
@@ -403,6 +471,14 @@ const expensesSlice = createSlice({
         state.monthlyTotals = toSafeArray(action.payload.monthlyTotals);
         state.oldestDate = action.payload.oldestDate;
         state.error = null;
+        // Página 0 cargada: resetea el scroll infinito.
+        state.pageExp = action.payload.pageExp;
+        state.pageInc = action.payload.pageInc;
+        state.hasMoreExp = action.payload.hasMoreExp;
+        state.hasMoreInc = action.payload.hasMoreInc;
+        state.monthCountExp = action.payload.monthCountExp;
+        state.monthCountInc = action.payload.monthCountInc;
+        state.loadingMore = false;
       })
       .addCase(fetchExpenses.rejected, (state, action) => {
         state.loading = false;
@@ -412,6 +488,33 @@ const expensesSlice = createSlice({
         state.recent = toSafeArray(state.recent);
         state.summary = toSafeArray(state.summary);
         state.budgets = toSafeArray(state.budgets);
+      })
+      .addCase(fetchMoreExpenses.pending, (state) => {
+        state.loadingMore = true;
+      })
+      .addCase(fetchMoreExpenses.fulfilled, (state, action) => {
+        state.loadingMore = false;
+        if (!action.payload) return;
+        const { moreExp, moreInc, fetchExp, fetchInc } = action.payload;
+        if (fetchExp) {
+          state.pageExp += 1;
+          state.hasMoreExp = moreExp.length >= PAGE_SIZE;
+        }
+        if (fetchInc) {
+          state.pageInc += 1;
+          state.hasMoreInc = moreInc.length >= PAGE_SIZE;
+        }
+        if (moreExp.length === 0 && moreInc.length === 0) return;
+        // Append con dedupe por id (cinturón ante doble fetch concurrente).
+        const seen = new Set(state.recent.map((e) => e.id));
+        const fresh = [...moreExp, ...moreInc].filter((e) => e && !seen.has(e.id));
+        for (const e of fresh) seen.add(e.id);
+        state.recent = [...state.recent, ...fresh].sort(
+          (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
+        );
+      })
+      .addCase(fetchMoreExpenses.rejected, (state) => {
+        state.loadingMore = false;
       })
       .addCase(saveOneExpense.pending, (state) => {
         state.saving = true;

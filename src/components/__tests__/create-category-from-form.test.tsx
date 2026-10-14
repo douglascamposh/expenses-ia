@@ -29,7 +29,7 @@ async function createCategoryFromForm(queries: ReturnType<typeof renderWithStore
   const savers = getAllByLabelText('Guardar');
   fireEvent.press(savers[savers.length - 1]);
   // Timeout amplio: bajo carga del suite completo el thunk + rerender tardan más.
-  await waitFor(() => expect(queryByText('Nueva categoría')).toBeNull(), { timeout: 5000 });
+  await waitFor(() => expect(queryByText('Nueva categoría')).toBeNull(), { timeout: 10000 });
 }
 
 describe('Crear categoría desde el formulario de gasto (store real)', () => {
@@ -40,13 +40,12 @@ describe('Crear categoría desde el formulario de gasto (store real)', () => {
     setCustomCategories([]);
   });
 
-  it('misma kind: aparece en el carrusel y queda seleccionada', async () => {
-    const queries = renderWithStore();
+  it('misma kind: aparece en el carrusel y queda seleccionada', async () => {    const queries = renderWithStore();
     await createCategoryFromForm(queries, 'Mascotas');
     const pill = queries.getByLabelText('Mascotas');
     expect(pill).toBeTruthy();
     expect(pill.props.accessibilityState?.selected).toBe(true);
-  });
+  }, 15000);
 
   it('kind distinto (INGRESO desde form de gasto): el form lo adopta, se muestra y queda seleccionada', async () => {
     const queries = renderWithStore();
@@ -55,5 +54,5 @@ describe('Crear categoría desde el formulario de gasto (store real)', () => {
     const pill = queries.getByLabelText('Freelance');
     expect(pill).toBeTruthy();
     expect(pill.props.accessibilityState?.selected).toBe(true);
-  });
+  }, 15000);
 });

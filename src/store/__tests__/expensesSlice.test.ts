@@ -4,6 +4,7 @@ import reducer, {
   createExpense,
   deleteBudget,
   fetchExpenses,
+  fetchMoreExpenses,
   saveAllExpenses,
   answerAnalytics,
   saveOneExpense,
@@ -12,7 +13,7 @@ import reducer, {
   upsertBudget,
 } from '../expensesSlice';
 import { ExpenseCategory } from '@/expenses/categories/expenseCategories';
-import type { NewExpense } from '@/expenses/models/Expense';
+import type { Expense, NewExpense } from '@/expenses/models/Expense';
 import { expenseRepository } from '@/expenses/repositories/ExpenseRepository';
 import { InMemoryExpenseRepository } from '@/expenses/repositories/ExpenseRepository';
 import { budgetRepository } from '@/expenses/repositories/BudgetRepository';
@@ -31,6 +32,7 @@ function bindMemory() {
   (expenseRepository as unknown as InMemoryExpenseRepository).getAll = mem.getAll.bind(mem);
   (expenseRepository as unknown as InMemoryExpenseRepository).getRecent = mem.getRecent.bind(mem);
   (expenseRepository as unknown as InMemoryExpenseRepository).getByMonthRange = mem.getByMonthRange.bind(mem);
+  (expenseRepository as unknown as InMemoryExpenseRepository).countByMonthRange = mem.countByMonthRange.bind(mem);
   (expenseRepository as unknown as InMemoryExpenseRepository).getCategorySummary = mem.getCategorySummary.bind(mem);
   (expenseRepository as unknown as InMemoryExpenseRepository).delete = mem.delete.bind(mem);
   (expenseRepository as unknown as InMemoryExpenseRepository).update = mem.update.bind(mem);
@@ -365,5 +367,87 @@ describe('kind EXPENSE/INCOME', () => {
     expect(s.incomeTotalMonth.BOB).toBe(1000);
     // El resumen del carrusel solo lleva gastos
     expect(s.summary.every((x) => x.total !== 1000)).toBe(true);
+  });
+});
+
+describe('scroll infinito del mes (fetchMoreExpenses)', () => {
+  async function seedMonth35() {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    const ym = `${year}-${String(month).padStart(2, '0')}`;
+    for (let i = 0; i < 35; i++) {
+      const day = String((i % 28) + 1).padStart(2, '0');
+      const stamp = `${ym}-${day}T10:00:${String(i).padStart(2, '0')}Z`;
+      const e: Expense = {
+        id: `pg-${i}`,
+        amount: 10 + i,
+        currency: 'BOB',
+        category: ExpenseCategory.FOOD,
+        kind: 'EXPENSE',
+        description: `Gasto ${i}`,
+        date: `${ym}-${day}`,
+        paymentMethod: 'CASH',
+        createdAt: stamp,
+        updatedAt: stamp,
+      };
+      await mem.create(e);
+    }
+    return { year, month };
+  }
+
+  it('página 0 trae 30, marca hasMore y cuenta el total', async () => {
+    await seedMonth35();
+    const store = makeStore();
+    await store.dispatch(fetchExpenses(await seedMonth35())).unwrap();
+    const s = store.getState().expenses;
+    expect(s.recent).toHaveLength(30);
+    expect(s.hasMoreExp).toBe(true);
+    expect(s.hasMoreInc).toBe(false);
+    expect(s.monthCountExp).toBe(35);
+    expect(s.monthCountInc).toBe(0);
+    expect(s.pageExp).toBe(1);
+  });
+
+  it('fetchMore agrega la página 2 sin duplicados y cierra hasMore', async () => {
+    await seedMonth35();
+    const store = makeStore();
+    await store.dispatch(fetchExpenses(await seedMonth35())).unwrap();
+    await store.dispatch(fetchMoreExpenses(undefined)).unwrap();
+    const s = store.getState().expenses;
+    expect(s.recent).toHaveLength(35);
+    expect(s.hasMoreExp).toBe(false);
+    expect(s.pageExp).toBe(2);
+    expect(new Set(s.recent.map((e) => e.id)).size).toBe(35);
+    // Orden DESC global tras el append
+    for (let i = 1; i < s.recent.length; i++) {
+      const prev = s.recent[i - 1];
+      const cur = s.recent[i];
+      expect(prev.date > cur.date || (prev.date === cur.date && prev.createdAt >= cur.createdAt)).toBe(true);
+    }
+  });
+
+  it('fetchMore sin páginas restantes es no-op (cancela por condition)', async () => {
+    await seedMonth35();
+    const store = makeStore();
+    await store.dispatch(fetchExpenses(await seedMonth35())).unwrap();
+    await store.dispatch(fetchMoreExpenses(undefined)).unwrap();
+    const before = store.getState().expenses.recent.map((e) => e.id);
+    await store.dispatch(fetchMoreExpenses(undefined)).unwrap().catch(() => null);
+    expect(store.getState().expenses.recent.map((e) => e.id)).toEqual(before);
+    expect(store.getState().expenses.loadingMore).toBe(false);
+  });
+
+  it('fetchExpenses resetea la paginación tras avanzar', async () => {
+    await seedMonth35();
+    const store = makeStore();
+    await store.dispatch(fetchExpenses(await seedMonth35())).unwrap();
+    await store.dispatch(fetchMoreExpenses(undefined)).unwrap();
+    expect(store.getState().expenses.recent).toHaveLength(35);
+    await store.dispatch(fetchExpenses(await seedMonth35())).unwrap();
+    const s = store.getState().expenses;
+    expect(s.recent).toHaveLength(30);
+    expect(s.pageExp).toBe(1);
+    expect(s.hasMoreExp).toBe(true);
   });
 });

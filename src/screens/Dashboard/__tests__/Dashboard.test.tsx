@@ -49,6 +49,7 @@ jest.mock('@/expenses/repositories/ExpenseRepository', () => ({
     getAll: jest.fn(() => Promise.resolve([])),
     getRecent: jest.fn(() => Promise.resolve([])),
     getByMonthRange: jest.fn(() => Promise.resolve([])),
+    countByMonthRange: jest.fn(() => Promise.resolve(0)),
     getCategorySummary: jest.fn(() => Promise.resolve([])),
     getMonthlyTotals: jest.fn(() => Promise.resolve([])),
     getOldestDate: jest.fn(() => Promise.resolve(null)),
@@ -461,5 +462,54 @@ describe('Dashboard', () => {
     };
     await waitFor(() => expect(budgetRepository.upsert).toHaveBeenCalled());
     expect(budgetRepository.upsert.mock.calls[0][0]).toMatchObject({ category: 'FOOD', amount: 500 });
+  });
+});
+
+describe('Dashboard scroll infinito', () => {
+  function pageRows(prefix: string, n: number) {
+    return Array.from({ length: n }, (_, i) => ({
+      id: `${prefix}-${i}`,
+      amount: 10,
+      currency: 'BOB',
+      category: 'FOOD',
+      kind: 'EXPENSE',
+      description: `Gasto ${prefix}-${i}`,
+      date: monthISODate(5),
+      paymentMethod: 'CASH',
+      createdAt: monthISODateTime(5),
+      updatedAt: monthISODateTime(5),
+    }));
+  }
+
+  function nearBottomEvent() {
+    return {
+      nativeEvent: {
+        layoutMeasurement: { height: 800, width: 400 },
+        contentOffset: { y: 5000, x: 0 },
+        contentSize: { height: 5600, width: 400 },
+      },
+    };
+  }
+
+  it('muestra contador y carga la página 2 al llegar al final', async () => {
+    const { expenseRepository } = jest.requireMock('@/expenses/repositories/ExpenseRepository') as {
+      expenseRepository: { getByMonthRange: jest.Mock; countByMonthRange: jest.Mock };
+    };
+    const page0 = pageRows('p0', 30);
+    const page1 = pageRows('p1', 5);
+    expenseRepository.getByMonthRange
+      .mockResolvedValueOnce(page0)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(page1);
+    expenseRepository.countByMonthRange
+      .mockResolvedValueOnce(35)
+      .mockResolvedValueOnce(0);
+    const { getByTestId, getByText, queryByText } = renderWithStore();
+    await waitFor(() => expect(getByText('Gasto p0-0')).toBeTruthy());
+    expect(getByText('Mostrando 30 de 35')).toBeTruthy();
+    expect(queryByText('Gasto p1-0')).toBeNull();
+    fireEvent.scroll(getByTestId('month-scroll'), nearBottomEvent());
+    await waitFor(() => expect(getByText('Gasto p1-0')).toBeTruthy());
+    expect(getByText('Mostrando 35 de 35')).toBeTruthy();
   });
 });

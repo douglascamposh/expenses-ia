@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -37,6 +37,8 @@ import {
   createExpense,
   deleteExpense,
   fetchExpenses,
+  fetchMoreExpenses,
+  PAGE_SIZE,
   removePendingAt,
   saveAllExpenses,
   saveOneExpense,
@@ -80,6 +82,10 @@ export function DashboardScreen() {
   const incomeTotalMonth = useAppSelector((s) => s.expenses.incomeTotalMonth ?? {});
   const loading = useAppSelector((s) => s.expenses.loading);
   const error = useAppSelector((s) => s.expenses.error);
+  /** Scroll infinito de la lista del mes. */
+  const loadingMore = useAppSelector((s) => s.expenses.loadingMore);
+  const hasMore = useAppSelector((s) => s.expenses.hasMoreExp || s.expenses.hasMoreInc);
+  const monthTotal = useAppSelector((s) => (s.expenses.monthCountExp ?? 0) + (s.expenses.monthCountInc ?? 0));
   const pendingQueue = useAppSelector((s) => s.expenses.pendingQueue ?? []);
   const saving = useAppSelector((s) => s.expenses.saving);
   const saveError = useAppSelector((s) => s.expenses.saveError);
@@ -331,7 +337,7 @@ export function DashboardScreen() {
     );
   }, [searchScope, searchQuery, analytics]);
 
-  /** Recientes del mes agrupados por fecha (máx. 5 fechas, 30 items). Buscando: resultados. */
+  /** Recientes del mes agrupados por fecha. Sin tope: el scroll infinito pagina en SQLite. Buscando: resultados (tope 30). */
   const searching = searchOpen && searchQuery.trim().length >= 2;
   const visibleRecent = useMemo(
     () =>
@@ -343,7 +349,37 @@ export function DashboardScreen() {
         .filter((e) => (heroMode === 'exp' ? (e.kind ?? 'EXPENSE') === 'EXPENSE' : heroMode === 'inc' ? e.kind === 'INCOME' : true)),
     [recent, filterCategory, heroMode, searching, homeResults],
   );
-  const recentSections = useMemo(() => groupRecent(visibleRecent, undefined, undefined, undefined, lang), [visibleRecent, lang]);
+  const recentSections = useMemo(
+    () =>
+      searching
+        ? groupRecent(visibleRecent, undefined, undefined, undefined, lang)
+        : groupRecent(visibleRecent, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, undefined, lang),
+    [visibleRecent, lang, searching],
+  );
+
+  /** Scroll infinito: cerca del final pide la siguiente página (thunk con guard). */
+  const handleScroll = useCallback(
+    ({
+      nativeEvent,
+    }: {
+      nativeEvent: {
+        layoutMeasurement: { height: number };
+        contentOffset: { y: number };
+        contentSize: { height: number };
+      };
+    }) => {
+      if (searching || !hasMore) return;
+      const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+      if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 500) {
+        // El thunk se auto-cancela (ConditionError) si ya carga o no hay más.
+        dispatch(fetchMoreExpenses()).catch(() => {});
+      }
+    },
+    [dispatch, searching, hasMore],
+  );
+
+  /** Contador "Mostrando X de Y": solo lista completa sin filtros y si hubo paginación. */
+  const showCounter = !searching && !filterCategory && heroMode === 'net' && monthTotal > PAGE_SIZE;
 
   const handleSaveOne = useCallback(
     (index: number, e: NewExpense) => {
@@ -446,6 +482,9 @@ export function DashboardScreen() {
         <ScrollView
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
+          scrollEventThrottle={300}
+          onScroll={handleScroll}
+          testID="month-scroll"
         >
           {/* Header mockup: September + gear */}
           <View style={styles.topBar}>
@@ -672,6 +711,17 @@ export function DashboardScreen() {
               {filterCategory && visibleRecent.length === 0 && (
                 <Text variant="small" color="textSecondary">{t('dashboard_noExpensesIn', { label: getCategoryConfig(filterCategory).label })}</Text>
               )}
+              {showCounter && (
+                <Text variant="small" color="textSecondary" align="center">
+                  {t('dashboard_showingOf', { shown: String((recent ?? []).length), total: String(monthTotal) })}
+                </Text>
+              )}
+              {loadingMore && (
+                <ActivityIndicator
+                  accessibilityLabel={t('dashboard_loadingExpenses')}
+                  style={styles.moreSpinner}
+                />
+              )}
             </View>
           )}
           </>)}
@@ -896,6 +946,7 @@ const styles = StyleSheet.create({
   dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.two, marginBottom: Spacing.one },
   dayPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999 },
   list: { gap: Spacing.two },
+  moreSpinner: { marginTop: Spacing.two, alignSelf: 'center' },
   emptyCard: { borderRadius: 16, padding: Spacing.four, alignItems: 'center', gap: Spacing.two, borderWidth: 1 },
   emptyHint: { textAlign: 'center', fontFamily: Fonts.sans },
   error: { color: '#EF4444', fontFamily: Fonts.sans },

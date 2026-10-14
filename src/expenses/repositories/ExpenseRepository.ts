@@ -7,8 +7,10 @@ export interface ExpenseRepository {
   getAll(): Promise<Expense[]>;
   getRecent(limit: number): Promise<Expense[]>;
   getByDateRange(from: string, to: string): Promise<Expense[]>;
-  /** Recientes del rango (mes en curso): solo kind dado, máx. limit, fecha DESC. */
-  getByMonthRange(from: string, to: string, kind: EntryKind, limit: number): Promise<Expense[]>;
+  /** Recientes del rango (mes en curso): solo kind dado, página limit/offset, fecha DESC. */
+  getByMonthRange(from: string, to: string, kind: EntryKind, limit: number, offset?: number): Promise<Expense[]>;
+  /** Total de movimientos del rango por kind (para "Mostrando X de Y" en scroll infinito). */
+  countByMonthRange(from: string, to: string, kind: EntryKind): Promise<number>;
   getCategorySummary(fromDate?: string, kind?: EntryKind, toDate?: string): Promise<{ category: string; currency: string; total: number }[]>;
   /** Total de gastos por mes (YYYY-MM) y moneda en el rango: alimenta la tira de meses. */
   getMonthlyTotals(from: string, to: string): Promise<{ month: string; currency: string; total: number }[]>;
@@ -88,13 +90,24 @@ export class SqliteExpenseRepository implements ExpenseRepository {
     return (rows ?? []).map(rowToExpense);
   }
 
-  async getByMonthRange(from: string, to: string, kind: EntryKind, limit: number): Promise<Expense[]> {
+  async getByMonthRange(from: string, to: string, kind: EntryKind, limit: number, offset = 0): Promise<Expense[]> {
     const db = await getDatabase();
     const rows = (await db.getAllAsync<Record<string, unknown>>(
-      'SELECT * FROM expenses WHERE is_deleted = 0 AND date >= ? AND date <= ? AND kind = ? ORDER BY date DESC, created_at DESC LIMIT ?',
-      [from, to, kind, limit],
+      'SELECT * FROM expenses WHERE is_deleted = 0 AND date >= ? AND date <= ? AND kind = ? ORDER BY date DESC, created_at DESC LIMIT ? OFFSET ?',
+      [from, to, kind, limit, Math.max(offset, 0)],
     )) ?? [];
     return (rows ?? []).map(rowToExpense);
+  }
+
+  async countByMonthRange(from: string, to: string, kind: EntryKind): Promise<number> {
+    const db = await getDatabase();
+    const row = await db
+      .getFirstAsync<{ n: number | null }>(
+        'SELECT COUNT(*) as n FROM expenses WHERE is_deleted = 0 AND date >= ? AND date <= ? AND kind = ?',
+        [from, to, kind],
+      )
+      .catch(() => null);
+    return row?.n ?? 0;
   }
 
   async getCategorySummary(fromDate?: string, kind: EntryKind = 'EXPENSE', toDate?: string): Promise<{ category: string; currency: string; total: number }[]> {
@@ -259,11 +272,15 @@ export class InMemoryExpenseRepository implements ExpenseRepository {
     const all = await this.getAll();
     return all.filter((e) => e.date >= from && e.date <= to);
   }
-  async getByMonthRange(from: string, to: string, kind: EntryKind, limit: number): Promise<Expense[]> {
+  async getByMonthRange(from: string, to: string, kind: EntryKind, limit: number, offset = 0): Promise<Expense[]> {
     const all = await this.getAll();
     return all
       .filter((e) => e.date >= from && e.date <= to && (e.kind ?? 'EXPENSE') === kind)
-      .slice(0, Math.max(limit, 0));
+      .slice(Math.max(offset, 0), Math.max(offset, 0) + Math.max(limit, 0));
+  }
+  async countByMonthRange(from: string, to: string, kind: EntryKind): Promise<number> {
+    const all = await this.getAll();
+    return all.filter((e) => e.date >= from && e.date <= to && (e.kind ?? 'EXPENSE') === kind).length;
   }
   async getCategorySummary(fromDate?: string, kind: EntryKind = 'EXPENSE', toDate?: string): Promise<{ category: string; currency: string; total: number }[]> {
     const all = await this.getAll();

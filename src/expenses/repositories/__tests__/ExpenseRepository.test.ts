@@ -169,3 +169,42 @@ describe('InMemoryExpenseRepository', () => {
     expect(await repo.getPendingDeletes()).toHaveLength(0);
   });
 });
+
+describe('InMemoryExpenseRepository pagination', () => {
+  async function seed35() {
+    const repo = new InMemoryExpenseRepository();
+    for (let i = 1; i <= 35; i++) {
+      // Días 01-30 ciclando (septiembre solo tiene 30): todo queda en rango.
+      const day = String(((i - 1) % 30) + 1).padStart(2, '0');
+      await repo.create(
+        makeExpense({
+          id: `e${i}`,
+          date: `2026-09-${day}`,
+          createdAt: `2026-09-${day}T10:00:${String(i).padStart(2, '0')}Z`,
+          kind: i % 2 === 0 ? 'INCOME' : 'EXPENSE',
+        }),
+      );
+    }
+    return repo;
+  }
+
+  it('getByMonthRange pagina con offset (30 + resto)', async () => {
+    const repo = await seed35();
+    // 35 días impares?? no: kind alternado → EXPENSE impares (18), INCOME pares (17)
+    const page0 = await repo.getByMonthRange('2026-09-01', '2026-09-30', 'EXPENSE', 10, 0);
+    const page1 = await repo.getByMonthRange('2026-09-01', '2026-09-30', 'EXPENSE', 10, 10);
+    expect(page0).toHaveLength(10);
+    expect(page1).toHaveLength(8);
+    // Sin solapamiento y orden DESC global
+    const ids0 = new Set(page0.map((e) => e.id));
+    expect(page1.every((e) => !ids0.has(e.id))).toBe(true);
+    expect(page0[0].date >= page0[9].date).toBe(true);
+  });
+
+  it('countByMonthRange cuenta por kind', async () => {
+    const repo = await seed35();
+    await expect(repo.countByMonthRange('2026-09-01', '2026-09-30', 'EXPENSE')).resolves.toBe(18);
+    await expect(repo.countByMonthRange('2026-09-01', '2026-09-30', 'INCOME')).resolves.toBe(17);
+    await expect(repo.countByMonthRange('2026-08-01', '2026-08-31', 'EXPENSE')).resolves.toBe(0);
+  });
+});

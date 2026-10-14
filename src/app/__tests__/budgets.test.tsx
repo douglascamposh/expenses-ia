@@ -14,6 +14,7 @@ jest.mock('@/expenses/repositories/ExpenseRepository', () => ({
     getAll: jest.fn(() => Promise.resolve([])),
     getRecent: jest.fn(() => Promise.resolve([])),
     getByMonthRange: jest.fn(() => Promise.resolve([])),
+    countByMonthRange: jest.fn(() => Promise.resolve(0)),
     getCategorySummary: jest.fn(() => Promise.resolve([])),
     getMonthlyTotals: jest.fn(() => Promise.resolve([])),
     getOldestDate: jest.fn(() => Promise.resolve(null)),

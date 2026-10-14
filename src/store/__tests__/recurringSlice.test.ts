@@ -24,6 +24,7 @@ function bindMemory() {
   exp.getAll = memExp.getAll.bind(memExp);
   exp.getRecent = memExp.getRecent.bind(memExp);
   exp.getByMonthRange = memExp.getByMonthRange.bind(memExp);
+  exp.countByMonthRange = memExp.countByMonthRange.bind(memExp);
   exp.getCategorySummary = memExp.getCategorySummary.bind(memExp);
   exp.getMonthlyTotals = memExp.getMonthlyTotals.bind(memExp);
   exp.getOldestDate = memExp.getOldestDate.bind(memExp);
